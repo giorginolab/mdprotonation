@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This repository is being shaped into a Streamlit app for exploring protein protonation states as a function of pH. Keep [`main.py`](/Users/toni/work/mdprotonation/main.py) as the Streamlit entrypoint, and move reusable logic into a package such as `src/mdprotonation/` as the app grows. Use `examples/` for sample structures like [`examples/7bcq.pdb`](/Users/toni/work/mdprotonation/examples/7bcq.pdb), and keep design notes in top-level Markdown files such as [`streamlist-molstar-howto.md`](/Users/toni/work/mdprotonation/streamlist-molstar-howto.md).
+This repository is being shaped into a Streamlit app for exploring protein protonation states as a function of pH. Keep [`main.py`](/Users/toni/work/mdprotonation/main.py) as the Streamlit entrypoint, and move reusable logic into a package such as `src/mdprotonation/` as the app grows. Use `examples/` for sample structures like [`examples/7bcq.pdb`](/Users/toni/work/mdprotonation/examples/7bcq.pdb). Refer to docs-of-helper-modules/ for misc documentation.
 
 Recommended modules:
 - `propka.py` for PROPka API calls and parsed residue pKa data.

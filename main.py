@@ -4,13 +4,16 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
-from streamlit_molstar import st_molstar_content
 
 from mdprotonation.propka_analysis import PropkaAnalysis, run_propka_analysis
 from mdprotonation.protonation import (
     evaluate_sites,
     render_ph_encoded_pdb,
     summarize_residues,
+)
+from mdprotonation.viewer import (
+    compute_residue_focus_targets,
+    st_molstar_focusable_content,
 )
 
 
@@ -78,6 +81,24 @@ def style_site_table(row: pd.Series) -> list[str]:
     return [f"background-color: {background}; color: {foreground}"] * len(row)
 
 
+def selected_rows_from_state(key: str) -> list[int]:
+    state = st.session_state.get(key)
+    if state is None:
+        return []
+
+    selection = getattr(state, "selection", None)
+    if selection is None and isinstance(state, dict):
+        selection = state.get("selection")
+
+    rows = getattr(selection, "rows", None)
+    if rows is None and isinstance(selection, dict):
+        rows = selection.get("rows")
+
+    if not isinstance(rows, list):
+        return []
+    return [row for row in rows if isinstance(row, int)]
+
+
 def main() -> None:
     st.title("Protein Protonation Explorer")
     st.caption(
@@ -139,6 +160,7 @@ def main() -> None:
     }
     residue_encodings = summarize_residues(site_states)
     encoded_pdb_text = render_ph_encoded_pdb(analysis.pdb_text, residue_encodings)
+    residue_focus_targets = compute_residue_focus_targets(analysis.pdb_text)
 
     transitioning_count = sum(
         1 for state in site_states if state.dominant_state == "Transitioning"
@@ -149,51 +171,86 @@ def main() -> None:
         key=lambda state: (abs(state.ph - state.site.pka), -state.transition_score),
     )
 
+    with st.sidebar:
+        st.subheader("Current State")
+        metric_col1, metric_col2 = st.columns(2)
+        metric_col1.metric("Titratable sites", len(site_states))
+        metric_col2.metric("Transitioning", transitioning_count)
+        metric_col1.metric("Folded charge", f"{folded_charge:.2f}")
+        metric_col2.metric("Structure", analysis.structure_name)
+
+        st.markdown("#### Residues responding most at this pH")
+        responsive_rows = [
+            {
+                "Site": state.site.label,
+                "pKa": state.site.pka,
+                "State": state.dominant_state,
+                "% Protonated": state.protonated_fraction * 100.0,
+            }
+            for state in responsive_sites[:8]
+        ]
+        responsive_df = pd.DataFrame(responsive_rows)
+        st.dataframe(
+            responsive_df,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "pKa": st.column_config.NumberColumn(format="%.2f"),
+                "% Protonated": st.column_config.NumberColumn(format="%.0f%%"),
+            },
+        )
+
     overview_tab, profiles_tab, propka_tab = st.tabs(
         ["Explorer", "Profiles", "PROPka Data"]
     )
 
     with overview_tab:
-        viewer_col, detail_col = st.columns([1.75, 1.0], gap="large")
-
-        with viewer_col:
-            st.subheader("Structure Viewer")
-            st_molstar_content(
-                encoded_pdb_text,
-                "pdb",
-                file_name=f"{analysis.structure_name}-ph-{ph:.1f}.pdb",
-                height="640px",
-                key=f"molstar-{analysis.structure_name}-{ph:.1f}",
-            )
-            st.caption(
-                "Viewer encoding: occupancy stores average protonated fraction per "
-                "titratable residue and B-factor stores transition intensity x100."
-            )
-
-        with detail_col:
-            st.subheader("Current State")
-            metric_col1, metric_col2 = st.columns(2)
-            metric_col1.metric("Titratable sites", len(site_states))
-            metric_col2.metric("Transitioning", transitioning_count)
-            metric_col1.metric("Folded charge", f"{folded_charge:.2f}")
-            metric_col2.metric("Structure", analysis.structure_name)
-
-            st.markdown("#### Residues responding most at this pH")
-            for state in responsive_sites[:8]:
-                st.write(
-                    (
-                        f"`{state.site.label}` | pKa {state.site.pka:.2f} | "
-                        f"{state.dominant_state} | "
-                        f"{state.protonated_fraction * 100:.0f}% protonated"
-                    )
-                )
-
-        st.subheader("Residue Protonation States")
         filtered_states = [
             state
             for state in site_states
             if not transition_only or state.dominant_state == "Transitioning"
         ]
+        sorted_states = sorted(
+            filtered_states,
+            key=lambda state: (
+                state.site.chain_id,
+                state.site.residue_number,
+                state.site.insertion_code,
+                state.site.label,
+            ),
+        )
+        selected_rows = selected_rows_from_state("site-state-table")
+        selected_state = (
+            sorted_states[selected_rows[0]]
+            if selected_rows and selected_rows[0] < len(sorted_states)
+            else None
+        )
+        focus_residue = (
+            residue_focus_targets.get(selected_state.site.residue_key)
+            if selected_state is not None
+            else None
+        )
+
+        st.subheader("Structure Viewer")
+        st_molstar_focusable_content(
+            encoded_pdb_text,
+            "pdb",
+            file_name=f"{analysis.structure_name}-ph-{ph:.1f}.pdb",
+            focus_residue=focus_residue,
+            height="640px",
+            key=f"molstar-{analysis.structure_name}-{ph:.1f}",
+        )
+        st.caption(
+            "Viewer encoding: occupancy stores average protonated fraction per "
+            "titratable residue and B-factor stores transition intensity x100."
+        )
+        if selected_state is not None:
+            st.caption(
+                f"Camera focus target: `{selected_state.site.label}` "
+                "from the selected table row."
+            )
+
+        st.subheader("Residue Protonation States")
         state_rows = [
             {
                 "pH7": (
@@ -213,26 +270,9 @@ def main() -> None:
                 "Charge": state.current_charge,
                 "State": state.dominant_state,
             }
-            for state in sorted(
-                filtered_states,
-                key=lambda state: (
-                    state.site.chain_id,
-                    state.site.residue_number,
-                    state.site.insertion_code,
-                    state.site.label,
-                ),
-            )
+            for state in sorted_states
         ]
         state_df = pd.DataFrame(state_rows)
-        sorted_states = sorted(
-            filtered_states,
-            key=lambda state: (
-                state.site.chain_id,
-                state.site.residue_number,
-                state.site.insertion_code,
-                state.site.label,
-            ),
-        )
         styled_state_df = state_df.style.apply(style_site_table, axis=1)
         styled_state_df = styled_state_df.format(
             {
@@ -251,6 +291,10 @@ def main() -> None:
             on_select="rerun",
             selection_mode="single-row",
         )
+        selected_rows = table_event.selection.rows or selected_rows
+        if selected_state is None and selected_rows and selected_rows[0] < len(sorted_states):
+            selected_state = sorted_states[selected_rows[0]]
+
         st.caption(
             "Row colors by charge (inverted scale): <= -0.75 red, "
             "(-0.75, -0.25] pink, (-0.25, +0.25) white, "
@@ -258,10 +302,8 @@ def main() -> None:
         )
         st.caption("`⚠️` marks sites not in their pH 7 dominant state.")
 
-        selected_rows = table_event.selection.rows
         st.subheader("Selected Site Interactions")
-        if selected_rows:
-            selected_state = sorted_states[selected_rows[0]]
+        if selected_state is not None:
             st.write(
                 (
                     f"`{selected_state.site.label}` | "

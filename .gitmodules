@@ -1,0 +1,3 @@
+[submodule "mdprotonation/vendor/streamlit-molstar"]
+	path = mdprotonation/vendor/streamlit-molstar
+	url = https://github.com/giorginolab/streamlit-molstar.git
