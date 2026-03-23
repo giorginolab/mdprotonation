@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 
 import pandas as pd
@@ -81,6 +82,36 @@ def style_site_table(row: pd.Series) -> list[str]:
     return [f"background-color: {background}; color: {foreground}"] * len(row)
 
 
+def selected_rows_from_selection(selection: object | None) -> list[int]:
+    if selection is None:
+        return []
+
+    rows = getattr(selection, "rows", None)
+    if rows is None and isinstance(selection, dict):
+        rows = selection.get("rows")
+    if isinstance(rows, list):
+        parsed_rows = [row for row in rows if isinstance(row, int)]
+        if parsed_rows:
+            return parsed_rows
+
+    cells = getattr(selection, "cells", None)
+    if cells is None and isinstance(selection, dict):
+        cells = selection.get("cells")
+    if not isinstance(cells, list):
+        return []
+
+    cell_rows: list[int] = []
+    for cell in cells:
+        if isinstance(cell, (tuple, list)) and cell and isinstance(cell[0], int):
+            cell_rows.append(cell[0])
+
+    unique_rows: list[int] = []
+    for row in cell_rows:
+        if row not in unique_rows:
+            unique_rows.append(row)
+    return unique_rows
+
+
 def selected_rows_from_state(key: str) -> list[int]:
     state = st.session_state.get(key)
     if state is None:
@@ -89,14 +120,11 @@ def selected_rows_from_state(key: str) -> list[int]:
     selection = getattr(state, "selection", None)
     if selection is None and isinstance(state, dict):
         selection = state.get("selection")
+    return selected_rows_from_selection(selection)
 
-    rows = getattr(selection, "rows", None)
-    if rows is None and isinstance(selection, dict):
-        rows = selection.get("rows")
 
-    if not isinstance(rows, list):
-        return []
-    return [row for row in rows if isinstance(row, int)]
+def set_active_selection_source(source: str) -> None:
+    st.session_state["active_selection_source"] = source
 
 
 def main() -> None:
@@ -170,6 +198,8 @@ def main() -> None:
         site_states,
         key=lambda state: (abs(state.ph - state.site.pka), -state.transition_score),
     )
+    top_responsive_sites = responsive_sites[:8]
+    responsive_selected_state = None
 
     with st.sidebar:
         st.subheader("Current State")
@@ -187,18 +217,30 @@ def main() -> None:
                 "State": state.dominant_state,
                 "% Protonated": state.protonated_fraction * 100.0,
             }
-            for state in responsive_sites[:8]
+            for state in top_responsive_sites
         ]
         responsive_df = pd.DataFrame(responsive_rows)
-        st.dataframe(
+        responsive_table_event = st.dataframe(
             responsive_df,
             use_container_width=True,
             hide_index=True,
+            key="responsive-site-table",
+            on_select=partial(set_active_selection_source, "responsive"),
+            selection_mode="single-cell",
             column_config={
                 "pKa": st.column_config.NumberColumn(format="%.2f"),
                 "% Protonated": st.column_config.NumberColumn(format="%.0f%%"),
             },
         )
+        responsive_selected_rows = (
+            selected_rows_from_selection(responsive_table_event.selection)
+            or selected_rows_from_state("responsive-site-table")
+        )
+        if (
+            responsive_selected_rows
+            and responsive_selected_rows[0] < len(top_responsive_sites)
+        ):
+            responsive_selected_state = top_responsive_sites[responsive_selected_rows[0]]
 
     overview_tab, profiles_tab, propka_tab = st.tabs(
         ["Explorer", "Profiles", "PROPka Data"]
@@ -220,11 +262,22 @@ def main() -> None:
             ),
         )
         selected_rows = selected_rows_from_state("site-state-table")
-        selected_state = (
+        main_table_selected_state = (
             sorted_states[selected_rows[0]]
             if selected_rows and selected_rows[0] < len(sorted_states)
             else None
         )
+        active_selection_source = st.session_state.get("active_selection_source", "main")
+        if (
+            active_selection_source == "responsive"
+            and responsive_selected_state is not None
+        ):
+            selected_state = responsive_selected_state
+        elif main_table_selected_state is not None:
+            selected_state = main_table_selected_state
+        else:
+            selected_state = responsive_selected_state
+
         focus_residue = (
             residue_focus_targets.get(selected_state.site.residue_key)
             if selected_state is not None
@@ -288,12 +341,16 @@ def main() -> None:
             use_container_width=True,
             hide_index=True,
             key="site-state-table",
-            on_select="rerun",
-            selection_mode="single-row",
+            on_select=partial(set_active_selection_source, "main"),
+            selection_mode="single-cell",
         )
-        selected_rows = table_event.selection.rows or selected_rows
-        if selected_state is None and selected_rows and selected_rows[0] < len(sorted_states):
-            selected_state = sorted_states[selected_rows[0]]
+        selected_rows = selected_rows_from_selection(table_event.selection) or selected_rows
+        if selected_rows and selected_rows[0] < len(sorted_states):
+            main_table_selected_state = sorted_states[selected_rows[0]]
+            if st.session_state.get("active_selection_source", "main") == "main":
+                selected_state = main_table_selected_state
+        elif selected_state is None:
+            selected_state = responsive_selected_state
 
         st.caption(
             "Row colors by charge (inverted scale): <= -0.75 red, "
@@ -330,7 +387,9 @@ def main() -> None:
             else:
                 st.info("PROPka reported no non-self interaction residues for this site.")
         else:
-            st.info("Click a row in the site table to inspect PROPka interaction residues.")
+            st.info(
+                "Click a row in either residue table to inspect PROPka interaction residues."
+            )
 
     with profiles_tab:
         st.subheader("Charge Profile")
