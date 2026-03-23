@@ -81,7 +81,8 @@ def style_site_table(row: pd.Series) -> list[str]:
 def main() -> None:
     st.title("Protein Protonation Explorer")
     st.caption(
-        "Explore continuous residue protonation as a function of pH using PROPka."
+        "Explore continuous residue protonation as a function of pH using "
+        "[PROPka](https://github.com/jensengroup/propka)."
     )
 
     with st.sidebar:
@@ -131,6 +132,11 @@ def main() -> None:
         return
 
     site_states = evaluate_sites(analysis.titration_sites, ph)
+    standard_site_states = evaluate_sites(analysis.titration_sites, 7.0)
+    standard_state_by_site = {
+        state.site.site_key: state.dominant_state
+        for state in standard_site_states
+    }
     residue_encodings = summarize_residues(site_states)
     encoded_pdb_text = render_ph_encoded_pdb(analysis.pdb_text, residue_encodings)
 
@@ -190,6 +196,12 @@ def main() -> None:
         ]
         state_rows = [
             {
+                "pH7": (
+                    ""
+                    if state.dominant_state
+                    == standard_state_by_site.get(state.site.site_key, state.dominant_state)
+                    else "⚠️"
+                ),
                 "Site": state.site.label,
                 "Residue": state.site.residue_type,
                 "Chain": state.site.chain_id,
@@ -244,6 +256,7 @@ def main() -> None:
             "(-0.75, -0.25] pink, (-0.25, +0.25) white, "
             "[+0.25, +0.75) slate blue, >= +0.75 deep blue."
         )
+        st.caption("`⚠️` marks sites not in their pH 7 dominant state.")
 
         selected_rows = table_event.selection.rows
         st.subheader("Selected Site Interactions")
