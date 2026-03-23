@@ -158,9 +158,10 @@ def main() -> None:
             for state in sorted(
                 filtered_states,
                 key=lambda state: (
-                    abs(state.ph - state.site.pka),
                     state.site.chain_id,
                     state.site.residue_number,
+                    state.site.insertion_code,
+                    state.site.label,
                 ),
             )
         ]
