@@ -56,27 +56,24 @@ def load_propka_analysis(pdb_text: str, filename: str) -> PropkaAnalysis:
 
 def style_site_table(row: pd.Series) -> list[str]:
     charge = float(row["Charge"])
-    state = str(row["State"])
 
-    if state == "Transitioning":
-        if charge > 0.05:
-            background = "#f6c1d6"
-            foreground = "#3f1025"
-        elif charge < -0.05:
-            background = "#6f82be"
-            foreground = "#ffffff"
-        else:
-            background = "#ffffff"
-            foreground = "#111827"
-    elif charge > 0.05:
-        background = "#c62828"
+    # Inverted five-bin scale across charge:
+    # red -> pink -> white -> slate blue -> deep blue
+    if charge <= -0.75:
+        background = "#c62828"  # red
         foreground = "#ffffff"
-    elif charge < -0.05:
-        background = "#0d47a1"
+    elif charge <= -0.25:
+        background = "#f6c1d6"  # pink
+        foreground = "#3f1025"
+    elif charge < 0.25:
+        background = "#ffffff"  # white
+        foreground = "#111827"
+    elif charge < 0.75:
+        background = "#6f82be"  # slate blue
         foreground = "#ffffff"
     else:
-        background = "#ffffff"
-        foreground = "#111827"
+        background = "#0d47a1"  # deep blue
+        foreground = "#ffffff"
 
     return [f"background-color: {background}; color: {foreground}"] * len(row)
 
@@ -197,11 +194,11 @@ def main() -> None:
                 "Residue": state.site.residue_type,
                 "Chain": state.site.chain_id,
                 "Residue #": state.site.residue_number,
-                "pKa": round(state.site.pka, 2),
-                "Model pKa": round(state.site.model_pka, 2),
-                "Buried fraction": round(state.site.buried_fraction, 3),
-                "% Protonated": round(state.protonated_fraction * 100.0, 1),
-                "Charge": round(state.current_charge, 3),
+                "pKa": state.site.pka,
+                "Model pKa": state.site.model_pka,
+                "Buried fraction": state.site.buried_fraction,
+                "% Protonated": state.protonated_fraction * 100.0,
+                "Charge": state.current_charge,
                 "State": state.dominant_state,
             }
             for state in sorted(
@@ -225,6 +222,15 @@ def main() -> None:
             ),
         )
         styled_state_df = state_df.style.apply(style_site_table, axis=1)
+        styled_state_df = styled_state_df.format(
+            {
+                "pKa": "{:.2f}",
+                "Model pKa": "{:.2f}",
+                "Buried fraction": "{:.3f}",
+                "Charge": "{:.3f}",
+                "% Protonated": "{:.0f}",
+            }
+        )
         table_event = st.dataframe(
             styled_state_df,
             use_container_width=True,
@@ -234,8 +240,9 @@ def main() -> None:
             selection_mode="single-row",
         )
         st.caption(
-            "Row colors: red cationic, pink transitioning positive, white near-neutral, "
-            "slate blue transitioning negative, deep blue anionic."
+            "Row colors by charge (inverted scale): <= -0.75 red, "
+            "(-0.75, -0.25] pink, (-0.25, +0.25) white, "
+            "[+0.25, +0.75) slate blue, >= +0.75 deep blue."
         )
 
         selected_rows = table_event.selection.rows
