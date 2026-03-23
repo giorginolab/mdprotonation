@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 from streamlit_molstar import st_molstar_content
 
@@ -18,10 +19,66 @@ st.set_page_config(
     layout="wide",
 )
 
+ANALYSIS_SCHEMA_VERSION = "2026-03-23-profiles-v1"
+
 
 @st.cache_data(show_spinner=False)
-def cached_propka_analysis(pdb_text: str, filename: str) -> PropkaAnalysis:
+def cached_propka_analysis(
+    pdb_text: str,
+    filename: str,
+    schema_version: str,
+) -> PropkaAnalysis:
+    del schema_version
     return run_propka_analysis(pdb_text, filename)
+
+
+def load_propka_analysis(pdb_text: str, filename: str) -> PropkaAnalysis:
+    analysis = cached_propka_analysis(
+        pdb_text,
+        filename,
+        ANALYSIS_SCHEMA_VERSION,
+    )
+    required_fields = (
+        "folding_profile",
+        "folding_optimum_ph",
+        "folding_optimum_energy",
+    )
+    if all(hasattr(analysis, field) for field in required_fields):
+        return analysis
+
+    cached_propka_analysis.clear()
+    return cached_propka_analysis(
+        pdb_text,
+        filename,
+        ANALYSIS_SCHEMA_VERSION,
+    )
+
+
+def style_site_table(row: pd.Series) -> list[str]:
+    charge = float(row["Charge"])
+    state = str(row["State"])
+
+    if state == "Transitioning":
+        if charge > 0.05:
+            background = "#f6c1d6"
+            foreground = "#3f1025"
+        elif charge < -0.05:
+            background = "#6f82be"
+            foreground = "#ffffff"
+        else:
+            background = "#ffffff"
+            foreground = "#111827"
+    elif charge > 0.05:
+        background = "#c62828"
+        foreground = "#ffffff"
+    elif charge < -0.05:
+        background = "#0d47a1"
+        foreground = "#ffffff"
+    else:
+        background = "#ffffff"
+        foreground = "#111827"
+
+    return [f"background-color: {background}; color: {foreground}"] * len(row)
 
 
 def main() -> None:
@@ -70,7 +127,7 @@ def main() -> None:
 
     try:
         with st.spinner("Running PROPka and assembling titration states..."):
-            analysis = cached_propka_analysis(pdb_text, source_name)
+            analysis = load_propka_analysis(pdb_text, source_name)
     except Exception as exc:
         st.error("PROPka could not process this structure.")
         st.exception(exc)
@@ -157,6 +214,7 @@ def main() -> None:
                 ),
             )
         ]
+        state_df = pd.DataFrame(state_rows)
         sorted_states = sorted(
             filtered_states,
             key=lambda state: (
@@ -166,13 +224,18 @@ def main() -> None:
                 state.site.label,
             ),
         )
+        styled_state_df = state_df.style.apply(style_site_table, axis=1)
         table_event = st.dataframe(
-            state_rows,
+            styled_state_df,
             use_container_width=True,
             hide_index=True,
             key="site-state-table",
             on_select="rerun",
             selection_mode="single-row",
+        )
+        st.caption(
+            "Row colors: red cationic, pink transitioning positive, white near-neutral, "
+            "slate blue transitioning negative, deep blue anionic."
         )
 
         selected_rows = table_event.selection.rows
