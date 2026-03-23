@@ -89,7 +89,9 @@ def main() -> None:
         key=lambda state: (abs(state.ph - state.site.pka), -state.transition_score),
     )
 
-    overview_tab, propka_tab = st.tabs(["Explorer", "PROPka Data"])
+    overview_tab, profiles_tab, propka_tab = st.tabs(
+        ["Explorer", "Profiles", "PROPka Data"]
+    )
 
     with overview_tab:
         viewer_col, detail_col = st.columns([1.75, 1.0], gap="large")
@@ -126,17 +128,6 @@ def main() -> None:
                     )
                 )
 
-        st.subheader("Charge Profile")
-        charge_points = [
-            {
-                "pH": point.ph,
-                "Folded charge": point.folded_charge,
-                "Unfolded charge": point.unfolded_charge,
-            }
-            for point in analysis.charge_profile
-        ]
-        st.line_chart(charge_points, x="pH", y=["Folded charge", "Unfolded charge"])
-
         st.subheader("Residue Protonation States")
         filtered_states = [
             state
@@ -151,6 +142,7 @@ def main() -> None:
                 "Residue #": state.site.residue_number,
                 "pKa": round(state.site.pka, 2),
                 "Model pKa": round(state.site.model_pka, 2),
+                "Buried fraction": round(state.site.buried_fraction, 3),
                 "% Protonated": round(state.protonated_fraction * 100.0, 1),
                 "Charge": round(state.current_charge, 3),
                 "State": state.dominant_state,
@@ -165,7 +157,95 @@ def main() -> None:
                 ),
             )
         ]
-        st.dataframe(state_rows, use_container_width=True, hide_index=True)
+        sorted_states = sorted(
+            filtered_states,
+            key=lambda state: (
+                state.site.chain_id,
+                state.site.residue_number,
+                state.site.insertion_code,
+                state.site.label,
+            ),
+        )
+        table_event = st.dataframe(
+            state_rows,
+            use_container_width=True,
+            hide_index=True,
+            key="site-state-table",
+            on_select="rerun",
+            selection_mode="single-row",
+        )
+
+        selected_rows = table_event.selection.rows
+        st.subheader("Selected Site Interactions")
+        if selected_rows:
+            selected_state = sorted_states[selected_rows[0]]
+            st.write(
+                (
+                    f"`{selected_state.site.label}` | "
+                    f"buried fraction `{selected_state.site.buried_fraction:.3f}` | "
+                    f"pKa `{selected_state.site.pka:.2f}`"
+                )
+            )
+            interaction_rows = [
+                {
+                    "Partner site": interaction.partner_label,
+                    "Chain": interaction.chain_id,
+                    "Residue #": interaction.residue_number,
+                    "Kind": interaction.interaction_kind,
+                    "Contribution": round(interaction.contribution, 3),
+                }
+                for interaction in selected_state.site.interactions
+            ]
+            if interaction_rows:
+                st.dataframe(
+                    interaction_rows,
+                    use_container_width=True,
+                    hide_index=True,
+                )
+            else:
+                st.info("PROPka reported no non-self interaction residues for this site.")
+        else:
+            st.info("Click a row in the site table to inspect PROPka interaction residues.")
+
+    with profiles_tab:
+        st.subheader("Charge Profile")
+        charge_points = [
+            {
+                "pH": point.ph,
+                "Folded charge": point.folded_charge,
+                "Unfolded charge": point.unfolded_charge,
+            }
+            for point in analysis.charge_profile
+        ]
+        st.line_chart(charge_points, x="pH", y=["Folded charge", "Unfolded charge"])
+
+        st.subheader("Free Energy of Folding")
+        if analysis.folding_profile:
+            if (
+                analysis.folding_optimum_ph is not None
+                and analysis.folding_optimum_energy is not None
+            ):
+                opt_col1, opt_col2 = st.columns(2)
+                opt_col1.metric("Optimum pH", f"{analysis.folding_optimum_ph:.2f}")
+                opt_col2.metric(
+                    "Minimum folding free energy",
+                    f"{analysis.folding_optimum_energy:.2f} kcal/mol",
+                )
+
+            folding_points = [
+                {
+                    "pH": point.ph,
+                    "Free energy of folding (kcal/mol)": point.folding_free_energy,
+                }
+                for point in analysis.folding_profile
+            ]
+            st.line_chart(
+                folding_points,
+                x="pH",
+                y=["Free energy of folding (kcal/mol)"],
+            )
+        else:
+            st.info("PROPka did not return a folding free-energy profile for this structure.")
 
     with propka_tab:
         st.subheader("PROPka Summary")
