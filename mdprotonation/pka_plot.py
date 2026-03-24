@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import ceil
 
 from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
@@ -228,3 +229,110 @@ def _clip_to_plot(value: float, inset: float = 0.0) -> float:
     if value > upper:
         return upper
     return value
+
+
+def create_pka_comparison_plot_figure(site_states: list[SiteState], current_ph: float) -> Figure:
+    sorted_states = sorted(site_states, key=site_state_sort_key)
+    if not sorted_states:
+        figure, axis = plt.subplots(figsize=(10.0, 3.0))
+        axis.text(
+            0.5,
+            0.5,
+            "No titratable sites were found.",
+            ha="center",
+            va="center",
+            fontsize=12,
+        )
+        axis.axis("off")
+        figure.tight_layout()
+        return figure
+
+    computed_values = [state.site.pka for state in sorted_states]
+    model_values = [state.site.model_pka for state in sorted_states]
+    delta_values = [pka - model for pka, model in zip(computed_values, model_values)]
+    labels = [_format_plot_label(state) for state in sorted_states]
+    x_positions = list(range(len(sorted_states)))
+
+    figure_width = max(12.5, (len(sorted_states) * 0.4) + 3.5)
+    figure, (pka_axis, delta_axis) = plt.subplots(
+        2,
+        1,
+        sharex=True,
+        figsize=(figure_width, 8.5),
+        gridspec_kw={"height_ratios": (3.2, 1.5)},
+    )
+
+    pka_axis.plot(
+        x_positions,
+        computed_values,
+        marker="o",
+        markersize=6.0,
+        linewidth=2.5,
+        color="#1d4ed8",
+        label="Computed pKa",
+    )
+    pka_axis.plot(
+        x_positions,
+        model_values,
+        marker="s",
+        markersize=6.0,
+        linewidth=2.5,
+        color="#ea580c",
+        label="Model pKa",
+    )
+    pka_axis.axhline(
+        current_ph,
+        color="#111827",
+        linewidth=1.8,
+        linestyle="--",
+        alpha=0.85,
+        label=f"Solution pH {current_ph:.1f}",
+    )
+    for x_pos, comp_pka, mod_pka in zip(x_positions, computed_values, model_values):
+        pka_axis.vlines(
+            x_pos,
+            ymin=min(comp_pka, mod_pka),
+            ymax=max(comp_pka, mod_pka),
+            color="#6b7280",
+            linewidth=1.8,
+            alpha=0.55,
+            zorder=1,
+        )
+    pka_axis.set_ylabel("pKa", fontsize=18)
+    pka_axis.grid(axis="y", color="#9ca3af", alpha=0.35, linewidth=0.8)
+    pka_axis.legend(loc="upper left", frameon=False, ncol=3, fontsize=14)
+    pka_axis.spines["top"].set_visible(False)
+    pka_axis.spines["right"].set_visible(False)
+    pka_axis.tick_params(axis="y", labelsize=14)
+
+    delta_axis.bar(
+        x_positions,
+        delta_values,
+        color=[_delta_color(value) for value in delta_values],
+        alpha=0.85,
+        width=0.72,
+    )
+    delta_axis.axhline(0.0, color="#111827", linewidth=1.5, alpha=0.85)
+    delta_axis.grid(axis="y", color="#9ca3af", alpha=0.35, linewidth=0.8)
+    delta_axis.set_ylabel("Delta pKa", fontsize=18)
+    delta_axis.set_xlabel("Residues", fontsize=18)
+    delta_axis.spines["top"].set_visible(False)
+    delta_axis.spines["right"].set_visible(False)
+    delta_axis.tick_params(axis="y", labelsize=14)
+
+    tick_step = max(1, ceil(len(labels) / 30))
+    tick_positions = x_positions[::tick_step]
+    tick_labels = labels[::tick_step]
+    delta_axis.set_xticks(tick_positions)
+    delta_axis.set_xticklabels(tick_labels, rotation=70, ha="right", fontsize=12)
+
+    figure.tight_layout()
+    return figure
+
+
+def _delta_color(delta_pka: float) -> str:
+    if delta_pka >= 0.5:
+        return "#16a34a"
+    if delta_pka <= -0.5:
+        return "#dc2626"
+    return "#6b7280"

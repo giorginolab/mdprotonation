@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from mdprotonation.pka_plot import (
     build_pka_plot_rows,
+    create_pka_comparison_plot_figure,
 )
 from mdprotonation.charge_colors import charge_color_band
 from mdprotonation.propka_analysis import TitrationSite
@@ -15,6 +16,7 @@ def make_site_state(
     residue_number: int,
     insertion_code: str = "",
     pka: float,
+    model_pka: float | None = None,
     charged_state_charge: float,
     dominant_state: str = "Neutral",
 ) -> SiteState:
@@ -25,7 +27,7 @@ def make_site_state(
         residue_number=residue_number,
         insertion_code=insertion_code,
         pka=pka,
-        model_pka=pka,
+        model_pka=model_pka if model_pka is not None else pka,
         charged_state_charge=charged_state_charge,
         buried_fraction=0.0,
         interactions=(),
@@ -101,3 +103,28 @@ def test_build_pka_plot_rows_clips_out_of_range_markers() -> None:
     assert rows[1].pka_marker == 13.78
     assert rows[1].charge_segments[0].start_ph == 0.0
     assert rows[1].charge_segments[-1].end_ph == 14.0
+
+
+def test_create_pka_comparison_plot_figure_runs_without_error() -> None:
+    states = [
+        make_site_state(
+            residue_type="LYS",
+            chain_id="A",
+            residue_number=1,
+            pka=10.5,
+            model_pka=10.0,
+            charged_state_charge=1.0,
+        ),
+        make_site_state(
+            residue_type="ASP",
+            chain_id="A",
+            residue_number=2,
+            pka=3.7,
+            model_pka=4.0,
+            charged_state_charge=-1.0,
+        ),
+    ]
+
+    figure = create_pka_comparison_plot_figure(states, current_ph=7.4)
+    assert figure is not None
+    assert len(figure.axes) == 2
