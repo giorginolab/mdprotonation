@@ -140,19 +140,18 @@ def render_chain_shift_tab(
     else:
         selected_shift = ranked_shifts[selected_row]
 
-    chain_pdb_text = monomer_analysis.pdb_text
-    focus_targets = cached_chain_focus_targets(chain_pdb_text)
-    focus_residue = focus_targets.get(selected_shift.residue_key)
+    focus_targets = cached_chain_focus_targets(analysis.pdb_text)
+    focus_residue = _resolve_focus_target(focus_targets, selected_shift)
 
     st.subheader("3D Shift Hot Spots")
     st.caption(
-        "The viewer loads the selected chain monomer and automatically focuses on "
+        "The viewer loads the full complex and automatically focuses on "
         "the highest-shift site. Select a table row to inspect another hot spot."
     )
     st_molstar_focusable_content(
-        chain_pdb_text,
+        analysis.pdb_text,
         "pdb",
-        file_name=f"{app_state.analysis.structure_name}-chain-{selected_chain}.pdb",
+        file_name=f"{app_state.analysis.structure_name}-complex.pdb",
         focus_residue=focus_residue,
         height=f"{SHIFT_VIEWER_HEIGHT}px",
         key=f"chain-shift-viewer-{app_state.analysis.structure_name}-{selected_chain}",
@@ -198,3 +197,16 @@ def _build_shift_dataframe(shifts: list[ChainPkaShift]) -> pd.DataFrame:
             for shift in shifts
         ]
     )
+
+
+def _resolve_focus_target(
+    focus_targets: dict[tuple[str, int, str], ResidueFocusTarget],
+    shift: ChainPkaShift,
+) -> ResidueFocusTarget | None:
+    focused = focus_targets.get(shift.residue_key)
+    if focused is not None:
+        return focused
+    for residue_key, target in focus_targets.items():
+        if residue_key[1] == shift.residue_number and residue_key[2] == shift.insertion_code:
+            return target
+    return None
