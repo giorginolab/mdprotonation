@@ -4,7 +4,7 @@
 
 ## Current Features
 
-- Load an example PDB from [`examples/`](/Users/toni/work/mdprotonation/examples) or upload a local `.pdb` file.
+- Load an example PDB from [`examples/`](/Users/toni/work/mdprotonation/examples), upload a local `.pdb` file, or fetch a structure by RCSB PDB ID.
 - Run PROPka directly in Python and cache the parsed result in Streamlit.
 - Sweep pH with a slider from 0.0 to 14.0.
 - Inspect per-site pKa, protonated fraction, current charge, and a simple state label.

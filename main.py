@@ -5,6 +5,7 @@ from pathlib import Path
 import streamlit as st
 
 from mdprotonation.app_state import build_app_state
+from mdprotonation.online_pdb import OnlinePdbError, fetch_pdb_from_rcsb, normalize_pdb_id
 from mdprotonation.panes import (
     render_explorer_tab,
     render_pka_plot_tab,
@@ -55,6 +56,11 @@ def load_propka_analysis(pdb_text: str, filename: str) -> PropkaAnalysis:
     )
 
 
+@st.cache_data(show_spinner=False)
+def cached_online_pdb_fetch(pdb_id: str) -> str:
+    return fetch_pdb_from_rcsb(pdb_id)
+
+
 def main() -> None:
     st.title("Protein Protonation Explorer")
     st.caption(
@@ -66,7 +72,7 @@ def main() -> None:
         st.header("Structure")
         source_mode = st.radio(
             "Input source",
-            options=("Example PDB", "Upload PDB"),
+            options=("Example PDB", "Upload PDB", "PDB Online"),
             index=0,
         )
 
@@ -82,13 +88,30 @@ def main() -> None:
             )
             source_name = selected_example.name
             pdb_text = selected_example.read_text(encoding="utf-8")
-        else:
+        elif source_mode == "Upload PDB":
             upload = st.file_uploader("Upload a PDB file", type=["pdb"])
             if upload is None:
                 st.info("Upload a PDB file to run PROPKA.")
                 return
             source_name = upload.name
             pdb_text = upload.getvalue().decode("utf-8")
+        else:
+            pdb_id_input = st.text_input("RCSB PDB ID", value="7BCQ", max_chars=4)
+            if not pdb_id_input.strip():
+                st.info("Enter a 4-character PDB ID to download a structure.")
+                return
+            try:
+                pdb_id = normalize_pdb_id(pdb_id_input)
+            except ValueError as exc:
+                st.warning(str(exc))
+                return
+            try:
+                with st.spinner(f"Downloading {pdb_id} from RCSB..."):
+                    pdb_text = cached_online_pdb_fetch(pdb_id)
+            except OnlinePdbError as exc:
+                st.error(str(exc))
+                return
+            source_name = f"{pdb_id}.pdb"
 
         st.header("pH")
         ph = st.slider(
