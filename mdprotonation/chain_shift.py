@@ -169,7 +169,10 @@ def top_shift_residue_keys(
     return tuple(shift.residue_key for shift in ranked_shifts[:limit])
 
 
-def create_chain_shift_plot_figure(shifts: Iterable[ChainPkaShift]) -> Figure:
+def create_chain_shift_plot_figure(
+    shifts: Iterable[ChainPkaShift],
+    current_ph: float | None = None,
+) -> Figure:
     ordered_shifts = list(shifts)
     if not ordered_shifts:
         figure, axis = plt.subplots(figsize=(10.0, 3.0))
@@ -196,7 +199,7 @@ def create_chain_shift_plot_figure(shifts: Iterable[ChainPkaShift]) -> Figure:
         2,
         1,
         sharex=True,
-        figsize=(figure_width, 7.2),
+        figsize=(figure_width, 3.6),
         gridspec_kw={"height_ratios": (3.2, 1.5)},
     )
 
@@ -218,6 +221,15 @@ def create_chain_shift_plot_figure(shifts: Iterable[ChainPkaShift]) -> Figure:
         color="#ea580c",
         label="Monomer",
     )
+    if current_ph is not None:
+        pka_axis.axhline(
+            current_ph,
+            color="#111827",
+            linewidth=1.2,
+            linestyle="--",
+            alpha=0.85,
+            label=f"Solution pH {current_ph:.1f}",
+        )
     for x_position, complex_pka, monomer_pka in zip(
         x_positions, complex_values, monomer_values
     ):

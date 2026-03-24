@@ -98,7 +98,7 @@ def render_chain_shift_tab(
     hot_spot_col.metric("Hot-spot residues (|Delta| >= 0.5)", f"{hot_spot_residue_count}")
 
     st.pyplot(
-        create_chain_shift_plot_figure(comparison.shifts),
+        create_chain_shift_plot_figure(comparison.shifts, current_ph=app_state.ph),
         use_container_width=True,
     )
 
