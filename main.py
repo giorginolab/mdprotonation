@@ -7,6 +7,7 @@ import streamlit as st
 from mdprotonation.app_state import build_app_state
 from mdprotonation.online_pdb import OnlinePdbError, fetch_pdb_from_rcsb, normalize_pdb_id
 from mdprotonation.panes import (
+    render_chain_shift_tab,
     render_explorer_tab,
     render_pka_plot_tab,
     render_profiles_tab,
@@ -134,8 +135,8 @@ def main() -> None:
     app_state = build_app_state(analysis, ph)
     responsive_selected_state = render_sidebar_summary(app_state)
 
-    overview_tab, pka_plot_tab, profiles_tab, propka_tab = st.tabs(
-        ["Explorer", "pKa Plot", "Profiles", "PROPKA Data"]
+    overview_tab, pka_plot_tab, profiles_tab, chain_shift_tab, propka_tab = st.tabs(
+        ["Explorer", "pKa Plot", "Profiles", "Chain Shifts", "PROPKA Data"]
     )
 
     with overview_tab:
@@ -150,6 +151,9 @@ def main() -> None:
 
     with profiles_tab:
         render_profiles_tab(analysis)
+
+    with chain_shift_tab:
+        render_chain_shift_tab(analysis, app_state)
 
     with propka_tab:
         render_propka_data_tab(analysis)
