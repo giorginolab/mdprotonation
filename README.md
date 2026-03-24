@@ -1,12 +1,12 @@
-# mdprotonation
+# pkaScope
 
-`mdprotonation` is a Streamlit web app for exploring protein protonation states as a function of pH. It runs [PROPka](https://github.com/jensengroup/propka) through its Python API, computes continuous protonation fractions for titratable sites, and exposes the result through an interactive structure viewer and residue tables.
+`pkaScope` is a Streamlit web app for exploring protein protonation states as a function of pH. It runs [PROPka](https://github.com/jensengroup/propka) through its Python API, computes continuous protonation fractions for titratable sites, and exposes the result through an interactive structure viewer and residue tables.
 
 Live demo: [Hugging Face Space](https://huggingface.co/spaces/tonigi/pkaScope)
 
 ## Current Features
 
-- Load an example PDB from [`examples/`](/Users/toni/work/mdprotonation/examples), upload a local `.pdb` file, or fetch a structure by RCSB PDB ID.
+- Load an example PDB from [`examples/`](/Users/toni/work/pkaScope/examples), upload a local `.pdb` file, or fetch a structure by RCSB PDB ID.
 - Run PROPka directly in Python and cache the parsed result in Streamlit.
 - Sweep pH with a slider from 0.0 to 14.0.
 - Inspect per-site pKa, protonated fraction, current charge, and a simple state label.
@@ -39,10 +39,10 @@ This keeps the pH-dependent state available in the structure artifact now, while
 
 ## Project Layout
 
-- [`main.py`](/Users/toni/work/mdprotonation/main.py): Streamlit app entrypoint
-- [`mdprotonation/propka_analysis.py`](/Users/toni/work/mdprotonation/mdprotonation/propka_analysis.py): PROPka execution and result extraction
-- [`mdprotonation/protonation.py`](/Users/toni/work/mdprotonation/mdprotonation/protonation.py): pH-dependent protonation and viewer encoding logic
-- [`examples/7bcq.pdb`](/Users/toni/work/mdprotonation/examples/7bcq.pdb): example structure for local testing
+- [`main.py`](/Users/toni/work/pkaScope/main.py): Streamlit app entrypoint
+- [`pkaScope/propka_analysis.py`](/Users/toni/work/pkaScope/pkaScope/propka_analysis.py): PROPka execution and result extraction
+- [`pkaScope/protonation.py`](/Users/toni/work/pkaScope/pkaScope/protonation.py): pH-dependent protonation and viewer encoding logic
+- [`examples/7bcq.pdb`](/Users/toni/work/pkaScope/examples/7bcq.pdb): example structure for local testing
 
 ## Next Steps
 

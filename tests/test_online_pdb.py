@@ -4,7 +4,7 @@ from urllib.error import HTTPError, URLError
 
 import pytest
 
-from mdprotonation.online_pdb import OnlinePdbError, fetch_pdb_from_rcsb, normalize_pdb_id
+from pkaScope.online_pdb import OnlinePdbError, fetch_pdb_from_rcsb, normalize_pdb_id
 
 
 def test_normalize_pdb_id_strips_and_uppercases() -> None:
@@ -42,7 +42,7 @@ def test_fetch_pdb_from_rcsb_returns_text(monkeypatch: pytest.MonkeyPatch) -> No
         assert getattr(request, "full_url") == "https://files.rcsb.org/download/7BCQ.pdb"
         return _FakeResponse(b"ATOM      1  N   GLY A   1       0.000   0.000   0.000\n")
 
-    monkeypatch.setattr("mdprotonation.online_pdb.urlopen", fake_urlopen)
+    monkeypatch.setattr("pkaScope.online_pdb.urlopen", fake_urlopen)
 
     pdb_text = fetch_pdb_from_rcsb("7bcq")
 
@@ -60,7 +60,7 @@ def test_fetch_pdb_from_rcsb_reports_not_found(monkeypatch: pytest.MonkeyPatch) 
             fp=None,
         )
 
-    monkeypatch.setattr("mdprotonation.online_pdb.urlopen", fake_urlopen)
+    monkeypatch.setattr("pkaScope.online_pdb.urlopen", fake_urlopen)
 
     with pytest.raises(OnlinePdbError, match="not found"):
         fetch_pdb_from_rcsb("xxxx")
@@ -71,7 +71,7 @@ def test_fetch_pdb_from_rcsb_reports_network_errors(monkeypatch: pytest.MonkeyPa
         del request, timeout
         raise URLError("offline")
 
-    monkeypatch.setattr("mdprotonation.online_pdb.urlopen", fake_urlopen)
+    monkeypatch.setattr("pkaScope.online_pdb.urlopen", fake_urlopen)
 
     with pytest.raises(OnlinePdbError, match="Could not reach RCSB"):
         fetch_pdb_from_rcsb("7BCQ")

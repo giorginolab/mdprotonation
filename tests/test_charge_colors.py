@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mdprotonation.charge_colors import charge_color_band
+from pkaScope.charge_colors import charge_color_band
 
 
 def test_charge_color_band_uses_protonation_threshold_boundaries() -> None:

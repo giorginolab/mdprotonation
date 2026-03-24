@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from mdprotonation.pka_plot import (
+from pkaScope.pka_plot import (
     build_pka_plot_rows,
     create_pka_plot_figure,
     create_pka_comparison_plot_figure,
 )
-from mdprotonation.charge_colors import charge_color_band
-from mdprotonation.propka_analysis import TitrationSite
-from mdprotonation.protonation import SiteState
+from pkaScope.charge_colors import charge_color_band
+from pkaScope.propka_analysis import TitrationSite
+from pkaScope.protonation import SiteState
 
 
 def make_site_state(

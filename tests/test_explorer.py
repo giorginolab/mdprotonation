@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from mdprotonation.panes.explorer import _site_column_label
-from mdprotonation.panes.explorer import (
+from pkaScope.panes.explorer import _site_column_label
+from pkaScope.panes.explorer import (
     SITE_TABLE_MAX_HEIGHT,
     SITE_TABLE_MIN_HEIGHT,
     _site_table_height,
 )
-from mdprotonation.propka_analysis import TitrationSite
-from mdprotonation.protonation import SiteState
+from pkaScope.propka_analysis import TitrationSite
+from pkaScope.protonation import SiteState
 
 
 def test_site_table_height_enforces_minimum_for_small_tables() -> None:

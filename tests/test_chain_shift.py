@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from mdprotonation.chain_shift import (
+from pkaScope.chain_shift import (
     compare_chain_pkas,
     extract_chain_pdb,
     list_chain_ids,
     top_shift_residue_keys,
 )
-from mdprotonation.propka_analysis import TitrationSite
+from pkaScope.propka_analysis import TitrationSite
 
 
 def _make_site(

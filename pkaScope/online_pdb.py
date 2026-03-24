@@ -18,7 +18,7 @@ def normalize_pdb_id(value: str) -> str:
 def fetch_pdb_from_rcsb(pdb_id: str, *, timeout_seconds: float = 10.0) -> str:
     normalized_pdb_id = normalize_pdb_id(pdb_id)
     url = f"https://files.rcsb.org/download/{normalized_pdb_id}.pdb"
-    request = Request(url=url, headers={"User-Agent": "mdprotonation/0.1"})
+    request = Request(url=url, headers={"User-Agent": "pkaScope/0.1"})
 
     try:
         with urlopen(request, timeout=timeout_seconds) as response:

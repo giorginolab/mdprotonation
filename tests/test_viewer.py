@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mdprotonation.viewer import compute_residue_focus_targets
+from pkaScope.viewer import compute_residue_focus_targets
 
 
 def test_compute_residue_focus_targets_groups_atoms_by_residue() -> None:

@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This repository is being shaped into a Streamlit app for exploring protein protonation states as a function of pH. Keep [`main.py`](/Users/toni/work/mdprotonation/main.py) as the Streamlit entrypoint, and move reusable logic into a package such as `src/mdprotonation/` as the app grows. Use `examples/` for sample structures like [`examples/7bcq.pdb`](/Users/toni/work/mdprotonation/examples/7bcq.pdb). Refer to docs-of-helper-modules/ for misc documentation.
+This repository is being shaped into a Streamlit app for exploring protein protonation states as a function of pH. Keep [`main.py`](/Users/toni/work/pkaScope/main.py) as the Streamlit entrypoint, and move reusable logic into a package such as `src/pkaScope/` as the app grows. Use `examples/` for sample structures like [`examples/7bcq.pdb`](/Users/toni/work/pkaScope/examples/7bcq.pdb). Refer to docs-of-helper-modules/ for misc documentation.
 
 Recommended modules:
 - `propka.py` for PROPka API calls and parsed residue pKa data.
@@ -15,7 +15,7 @@ Build the first version around one uploaded or example PDB, processed through th
 ## Build, Test, and Development Commands
 Use `uv` for all Python and package workflows.
 
-- `uv sync`: install or refresh dependencies from [`pyproject.toml`](/Users/toni/work/mdprotonation/pyproject.toml) and [`uv.lock`](/Users/toni/work/mdprotonation/uv.lock).
+- `uv sync`: install or refresh dependencies from [`pyproject.toml`](/Users/toni/work/pkaScope/pyproject.toml) and [`uv.lock`](/Users/toni/work/pkaScope/uv.lock).
 - `uv run streamlit run main.py`: launch the local web app.
 - `uv run python main.py`: run the lightweight entrypoint when debugging non-UI code.
 - `uv run python -m pytest`: run tests once `tests/` exists.

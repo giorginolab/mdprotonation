@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mdprotonation.pdb_utils import parse_pdb_atoms
+from pkaScope.pdb_utils import parse_pdb_atoms
 
 
 def test_parse_pdb_atoms_returns_residue_keys_and_coordinates() -> None:

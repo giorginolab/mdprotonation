@@ -1,5 +1,5 @@
 [project]
-name = "mdprotonation"
+name = "pkaScope"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -14,4 +14,9 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-streamlit-molstar = { path = "mdprotonation/vendor/streamlit-molstar" }
+streamlit-molstar = { path = "pkaScope/vendor/streamlit-molstar" }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

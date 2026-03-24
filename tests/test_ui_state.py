@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mdprotonation.ui_state import parse_selected_rows
+from pkaScope.ui_state import parse_selected_rows
 
 
 def test_parse_selected_rows_prefers_explicit_row_selection() -> None:

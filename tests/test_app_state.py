@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mdprotonation.app_state import ph7_reference_state
+from pkaScope.app_state import ph7_reference_state
 
 
 def test_ph7_reference_state_uses_requested_residue_classes() -> None:

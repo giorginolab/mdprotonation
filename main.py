@@ -4,9 +4,9 @@ from pathlib import Path
 
 import streamlit as st
 
-from mdprotonation.app_state import build_app_state
-from mdprotonation.online_pdb import OnlinePdbError, fetch_pdb_from_rcsb, normalize_pdb_id
-from mdprotonation.panes import (
+from pkaScope.app_state import build_app_state
+from pkaScope.online_pdb import OnlinePdbError, fetch_pdb_from_rcsb, normalize_pdb_id
+from pkaScope.panes import (
     render_chain_shift_tab,
     render_explorer_tab,
     render_pka_plot_tab,
@@ -14,7 +14,7 @@ from mdprotonation.panes import (
     render_propka_data_tab,
     render_sidebar_summary,
 )
-from mdprotonation.propka_analysis import PropkaAnalysis, run_propka_analysis
+from pkaScope.propka_analysis import PropkaAnalysis, run_propka_analysis
 
 
 st.set_page_config(
