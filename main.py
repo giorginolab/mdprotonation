@@ -117,7 +117,7 @@ def main() -> None:
     st.title("Protein Protonation Explorer")
     st.caption(
         "Explore continuous residue protonation as a function of pH using "
-        "[PROPka](https://github.com/jensengroup/propka)."
+        "[PROPKA](https://github.com/jensengroup/propka)."
     )
 
     with st.sidebar:
@@ -143,7 +143,7 @@ def main() -> None:
         else:
             upload = st.file_uploader("Upload a PDB file", type=["pdb"])
             if upload is None:
-                st.info("Upload a PDB file to run PROPka.")
+                st.info("Upload a PDB file to run PROPKA.")
                 return
             source_name = upload.name
             pdb_text = upload.getvalue().decode("utf-8")
@@ -159,10 +159,10 @@ def main() -> None:
         transition_only = st.checkbox("Show only transitioning sites", value=False)
 
     try:
-        with st.spinner("Running PROPka and assembling titration states..."):
+        with st.spinner("Running PROPKA and assembling titration states..."):
             analysis = load_propka_analysis(pdb_text, source_name)
     except Exception as exc:
-        st.error("PROPka could not process this structure.")
+        st.error("PROPKA could not process this structure.")
         st.exception(exc)
         return
 
@@ -228,8 +228,8 @@ def main() -> None:
         ):
             responsive_selected_state = top_responsive_sites[responsive_selected_rows[0]]
 
-    overview_tab, profiles_tab, pka_plot_tab, propka_tab = st.tabs(
-        ["Explorer", "Profiles", "pKa Plot", "PROPka Data"]
+    overview_tab, pka_plot_tab, profiles_tab, propka_tab = st.tabs(
+        ["Explorer", "pKa Plot", "Profiles", "PROPKA Data"]
     )
 
     with overview_tab:
@@ -371,10 +371,10 @@ def main() -> None:
                     hide_index=True,
                 )
             else:
-                st.info("PROPka reported no non-self interaction residues for this site.")
+                st.info("PROPKA reported no non-self interaction residues for this site.")
         else:
             st.info(
-                "Click a row in either residue table to inspect PROPka interaction residues."
+                "Click a row in either residue table to inspect PROPKA interaction residues."
             )
 
     with profiles_tab:
@@ -415,7 +415,7 @@ def main() -> None:
                 y=["Free energy of folding (kcal/mol)"],
             )
         else:
-            st.info("PROPka did not return a folding free-energy profile for this structure.")
+            st.info("PROPKA did not return a folding free-energy profile for this structure.")
 
     with pka_plot_tab:
         st.subheader("Residue pKa Landscape")
@@ -429,9 +429,9 @@ def main() -> None:
         )
 
     with propka_tab:
-        st.subheader("PROPka Summary")
+        st.subheader("PROPKA Summary")
         st.code(analysis.summary_text.strip(), language="text")
-        st.subheader("PROPka Determinants")
+        st.subheader("PROPKA Determinants")
         st.code(analysis.determinants_text.strip(), language="text")
 
 
