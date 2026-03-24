@@ -13,6 +13,8 @@ from .protonation import (
 from .viewer import ResidueFocusTarget, compute_residue_focus_targets
 
 SiteKey = tuple[str, int, str, str]
+PH7_CATIONIC_RESIDUES = frozenset({"ARG", "HIS", "LYS"})
+PH7_ANIONIC_RESIDUES = frozenset({"ASP", "GLU"})
 
 
 def site_state_sort_key(state: SiteState) -> tuple[str, int, str, str]:
@@ -26,6 +28,15 @@ def site_state_sort_key(state: SiteState) -> tuple[str, int, str, str]:
 
 def responsive_site_sort_key(state: SiteState) -> tuple[float, float]:
     return (abs(state.ph - state.site.pka), -state.transition_score)
+
+
+def ph7_reference_state(residue_type: str) -> str:
+    normalized_residue = residue_type.strip().upper()
+    if normalized_residue in PH7_CATIONIC_RESIDUES:
+        return "Cationic"
+    if normalized_residue in PH7_ANIONIC_RESIDUES:
+        return "Anionic"
+    return "Neutral"
 
 
 @dataclass(frozen=True)
@@ -56,8 +67,8 @@ def build_app_state(analysis: PropkaAnalysis, ph: float) -> AppState:
     site_states = tuple(evaluate_sites(analysis.titration_sites, ph))
     sorted_site_states = tuple(sorted(site_states, key=site_state_sort_key))
     standard_state_by_site = {
-        state.site.site_key: state.dominant_state
-        for state in evaluate_sites(analysis.titration_sites, 7.0)
+        site.site_key: ph7_reference_state(site.residue_type)
+        for site in analysis.titration_sites
     }
     residue_encodings = summarize_residues(list(site_states))
     encoded_pdb_text = render_ph_encoded_pdb(analysis.pdb_text, residue_encodings)

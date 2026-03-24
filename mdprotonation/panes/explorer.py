@@ -157,7 +157,7 @@ def _build_site_state_dataframe(
                     )
                     else TRANSITION_MARKER
                 ),
-                "Site": state.site.label,
+                "Site": _site_column_label(state),
                 "Residue": state.site.residue_type,
                 "Chain": state.site.chain_id,
                 "Residue #": state.site.residue_number,
@@ -203,3 +203,13 @@ def _site_table_height(row_count: int) -> int:
         return SITE_TABLE_MIN_HEIGHT
     estimated_height = SITE_TABLE_HEADER_HEIGHT + (row_count * SITE_TABLE_ROW_HEIGHT)
     return max(SITE_TABLE_MIN_HEIGHT, min(SITE_TABLE_MAX_HEIGHT, estimated_height))
+
+
+def _site_column_label(state: SiteState) -> str:
+    insertion_code = state.site.insertion_code.strip()
+    residue_token = (
+        f"{state.site.residue_number:>5}{insertion_code}"
+        if insertion_code
+        else f"{state.site.residue_number:>5}"
+    )
+    return f"{state.site.chain_id}:{residue_token}-{state.site.residue_type}"
