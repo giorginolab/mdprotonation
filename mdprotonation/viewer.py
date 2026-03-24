@@ -6,7 +6,7 @@ from pathlib import Path
 
 import streamlit.components.v1 as components
 
-ResidueKey = tuple[str, int, str]
+from .pdb_utils import ResidueKey, parse_pdb_atoms
 
 _COMPONENT_FUNC = components.declare_component(
     "mdprotonation_molstar",
@@ -44,12 +44,8 @@ class ResidueFocusTarget:
 
 def compute_residue_focus_targets(pdb_text: str) -> dict[ResidueKey, ResidueFocusTarget]:
     residue_atoms: dict[ResidueKey, list[tuple[float, float, float]]] = {}
-    for line in pdb_text.splitlines():
-        if not line.startswith(("ATOM  ", "HETATM")):
-            continue
-        residue_atoms.setdefault(_residue_key_from_pdb_line(line), []).append(
-            _coordinates_from_pdb_line(line)
-        )
+    for atom in parse_pdb_atoms(pdb_text):
+        residue_atoms.setdefault(atom.residue_key, []).append(atom.coordinates)
 
     focus_targets: dict[ResidueKey, ResidueFocusTarget] = {}
     for residue_key, coordinates in residue_atoms.items():
@@ -119,18 +115,3 @@ def _distance(
         + ((point[1] - center[1]) ** 2)
         + ((point[2] - center[2]) ** 2)
     )
-
-
-def _coordinates_from_pdb_line(line: str) -> tuple[float, float, float]:
-    return (
-        float(line[30:38]),
-        float(line[38:46]),
-        float(line[46:54]),
-    )
-
-
-def _residue_key_from_pdb_line(line: str) -> ResidueKey:
-    chain_id = line[21].strip() or "?"
-    residue_number = int(line[22:26])
-    insertion_code = line[26].strip()
-    return (chain_id, residue_number, insertion_code)

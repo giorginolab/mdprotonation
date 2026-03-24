@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from math import exp
 from statistics import mean
 
+from .pdb_utils import parse_pdb_atoms
 from .propka_analysis import TitrationSite
 
 
@@ -99,10 +100,15 @@ def render_ph_encoded_pdb(
         "REMARK 950 OCCUPANCY STORES AVERAGE PROTONATED FRACTION (0.00-1.00)\n",
         "REMARK 950 B-FACTOR STORES TRANSITION INTENSITY * 100 (0.00-100.00)\n",
     ]
+    parsed_atoms = iter(parse_pdb_atoms(pdb_text))
 
     for line in pdb_text.splitlines(keepends=True):
         if line.startswith(("ATOM  ", "HETATM")):
-            residue_key = _residue_key_from_pdb_line(line)
+            parsed_atom = next(parsed_atoms, None)
+            if parsed_atom is None:
+                encoded_lines.append(line)
+                continue
+            residue_key = parsed_atom.residue_key
             encoding = residue_encodings.get(residue_key)
             if encoding is not None:
                 occupancy = min(max(encoding.average_protonated_fraction, 0.0), 1.0)
@@ -126,10 +132,3 @@ def _dominant_state(site: TitrationSite, protonated: float) -> str:
     if site.charged_state_charge > 0:
         return "Cationic" if protonated >= 0.5 else "Neutral"
     return "Neutral" if protonated >= 0.5 else "Anionic"
-
-
-def _residue_key_from_pdb_line(line: str) -> tuple[str, int, str]:
-    chain_id = line[21].strip() or "?"
-    residue_number = int(line[22:26])
-    insertion_code = line[26].strip()
-    return (chain_id, residue_number, insertion_code)

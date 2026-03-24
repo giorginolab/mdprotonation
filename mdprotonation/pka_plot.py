@@ -7,7 +7,9 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
+from .app_state import site_state_sort_key
 from .charge_colors import charge_color_band, charge_legend_bands
+from .presentation import TRANSITION_MARKER, TRANSITION_WINDOW_LABEL
 from .protonation import SiteState, site_charge_at_ph
 
 PH_MIN = 0.0
@@ -37,15 +39,7 @@ class PkaPlotSegment:
 
 def build_pka_plot_rows(site_states: list[SiteState]) -> list[PkaPlotRow]:
     rows: list[PkaPlotRow] = []
-    sorted_states = sorted(
-        site_states,
-        key=lambda state: (
-            state.site.chain_id,
-            state.site.residue_number,
-            state.site.insertion_code,
-            state.site.label,
-        ),
-    )
+    sorted_states = sorted(site_states, key=site_state_sort_key)
     for state in sorted_states:
         rows.append(
             PkaPlotRow(
@@ -165,7 +159,7 @@ def create_pka_plot_figure(site_states: list[SiteState], current_ph: float) -> F
             color=TRANSITION_WINDOW_COLOR,
             linewidth=1.6,
             linestyle="--",
-            label="pH ± 1 transition window",
+            label=TRANSITION_WINDOW_LABEL,
         ),
     ]
     axis.legend(
@@ -187,7 +181,7 @@ def _format_plot_label(state: SiteState) -> str:
     residue_token = f"{site.residue_number}{insertion_code}" if insertion_code else str(
         site.residue_number
     )
-    prefix = "⚠️ " if state.dominant_state == "Transitioning" else ""
+    prefix = f"{TRANSITION_MARKER} " if state.dominant_state == "Transitioning" else ""
     return f"{prefix}{site.chain_id}:{residue_token}-{site.residue_type}"
 
 
