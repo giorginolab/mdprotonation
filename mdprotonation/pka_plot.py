@@ -7,14 +7,16 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from .protonation import SiteState
+from .charge_colors import charge_color_band, charge_legend_bands
+from .protonation import SiteState, site_charge_at_ph
 
 PH_MIN = 0.0
 PH_MAX = 14.0
-LANE_COLOR = "#b8b8b8"
-POSITIVE_RANGE_COLOR = "#ff6b4a"
-NEGATIVE_RANGE_COLOR = "#74b3d8"
+LANE_COLOR = charge_color_band(0.0).background
+LANE_EDGE_COLOR = "#d1d5db"
 CURRENT_PH_COLOR = "#3f3f46"
+TRANSITION_WINDOW_COLOR = "#6b7280"
+PH_SEGMENT_STEP = 0.1
 
 
 @dataclass(frozen=True)
@@ -22,10 +24,15 @@ class PkaPlotRow:
     label: str
     pka: float
     pka_marker: float
-    charged_range_start: float
-    charged_range_end: float
-    charged_range_color: str
+    charge_segments: tuple["PkaPlotSegment", ...]
     is_transitioning: bool
+
+
+@dataclass(frozen=True)
+class PkaPlotSegment:
+    start_ph: float
+    end_ph: float
+    color: str
 
 
 def build_pka_plot_rows(site_states: list[SiteState]) -> list[PkaPlotRow]:
@@ -40,24 +47,12 @@ def build_pka_plot_rows(site_states: list[SiteState]) -> list[PkaPlotRow]:
         ),
     )
     for state in sorted_states:
-        site = state.site
-        if site.charged_state_charge > 0:
-            charged_range_start = PH_MIN
-            charged_range_end = _clip_to_plot(site.pka)
-            charged_range_color = POSITIVE_RANGE_COLOR
-        else:
-            charged_range_start = _clip_to_plot(site.pka)
-            charged_range_end = PH_MAX
-            charged_range_color = NEGATIVE_RANGE_COLOR
-
         rows.append(
             PkaPlotRow(
                 label=_format_plot_label(state),
-                pka=site.pka,
-                pka_marker=_clip_to_plot(site.pka, inset=0.22),
-                charged_range_start=charged_range_start,
-                charged_range_end=charged_range_end,
-                charged_range_color=charged_range_color,
+                pka=state.site.pka,
+                pka_marker=_clip_to_plot(state.site.pka, inset=0.22),
+                charge_segments=_build_charge_segments(state),
                 is_transitioning=state.dominant_state == "Transitioning",
             )
         )
@@ -75,21 +70,20 @@ def create_pka_plot_figure(site_states: list[SiteState], current_ph: float) -> F
             PH_MAX - PH_MIN,
             left=PH_MIN,
             height=0.82,
-            color=LANE_COLOR,
-            edgecolor="white",
-            linewidth=0.35,
+            color="none",
+            edgecolor=LANE_EDGE_COLOR,
+            linewidth=0.7,
             zorder=1,
         )
-        charged_width = row.charged_range_end - row.charged_range_start
-        if charged_width > 0:
+        for segment in row.charge_segments:
             axis.barh(
                 index,
-                charged_width,
-                left=row.charged_range_start,
+                segment.end_ph - segment.start_ph,
+                left=segment.start_ph,
                 height=0.82,
-                color=row.charged_range_color,
-                edgecolor="white",
-                linewidth=0.35,
+                color=segment.color,
+                edgecolor=segment.color,
+                linewidth=0.0,
                 zorder=2,
             )
         axis.text(
@@ -109,6 +103,16 @@ def create_pka_plot_figure(site_states: list[SiteState], current_ph: float) -> F
             zorder=4,
         )
 
+    for boundary in (current_ph - 1.0, current_ph + 1.0):
+        if PH_MIN <= boundary <= PH_MAX:
+            axis.axvline(
+                boundary,
+                color=TRANSITION_WINDOW_COLOR,
+                linewidth=1.6,
+                alpha=0.55,
+                linestyle="--",
+                zorder=4,
+            )
     axis.axvline(
         current_ph,
         color=CURRENT_PH_COLOR,
@@ -145,15 +149,23 @@ def create_pka_plot_figure(site_states: list[SiteState], current_ph: float) -> F
     axis.spines["top"].set_linewidth(1.0)
 
     legend_handles = [
-        Patch(facecolor=POSITIVE_RANGE_COLOR, label="Positive charged range"),
-        Patch(facecolor=NEGATIVE_RANGE_COLOR, label="Negative charged range"),
-        Patch(facecolor=LANE_COLOR, label="Outside charged range"),
+        Patch(facecolor=band.color, edgecolor=LANE_EDGE_COLOR, label=band.label)
+        for band in charge_legend_bands()
+    ] + [
         Line2D(
             [0],
             [0],
             color=CURRENT_PH_COLOR,
             linewidth=2.4,
             label=f"Selected pH {current_ph:.1f}",
+        ),
+        Line2D(
+            [0],
+            [0],
+            color=TRANSITION_WINDOW_COLOR,
+            linewidth=1.6,
+            linestyle="--",
+            label="pH ± 1 transition window",
         ),
     ]
     axis.legend(
@@ -175,8 +187,43 @@ def _format_plot_label(state: SiteState) -> str:
     residue_token = f"{site.residue_number}{insertion_code}" if insertion_code else str(
         site.residue_number
     )
-    prefix = "(!) " if state.dominant_state == "Transitioning" else ""
+    prefix = "⚠️ " if state.dominant_state == "Transitioning" else ""
     return f"{prefix}{site.chain_id}:{residue_token}-{site.residue_type}"
+
+
+def _build_charge_segments(state: SiteState) -> tuple[PkaPlotSegment, ...]:
+    segments: list[PkaPlotSegment] = []
+    current_start = PH_MIN
+    current_color = charge_color_band(
+        site_charge_at_ph(state.site, PH_MIN + (PH_SEGMENT_STEP / 2.0))
+    ).background
+
+    ph = PH_MIN
+    while ph < PH_MAX:
+        start_ph = ph
+        end_ph = min(ph + PH_SEGMENT_STEP, PH_MAX)
+        midpoint = start_ph + ((end_ph - start_ph) / 2.0)
+        color = charge_color_band(site_charge_at_ph(state.site, midpoint)).background
+        if color != current_color:
+            segments.append(
+                PkaPlotSegment(
+                    start_ph=current_start,
+                    end_ph=start_ph,
+                    color=current_color,
+                )
+            )
+            current_start = start_ph
+            current_color = color
+        ph = end_ph
+
+    segments.append(
+        PkaPlotSegment(
+            start_ph=current_start,
+            end_ph=PH_MAX,
+            color=current_color,
+        )
+    )
+    return tuple(segments)
 
 
 def _clip_to_plot(value: float, inset: float = 0.0) -> float:

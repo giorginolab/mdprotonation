@@ -63,6 +63,11 @@ def evaluate_sites(sites: tuple[TitrationSite, ...], ph: float) -> list[SiteStat
     return states
 
 
+def site_charge_at_ph(site: TitrationSite, ph: float) -> float:
+    protonated = protonated_fraction(ph, site.pka)
+    return _charge_at_fraction(site, protonated)
+
+
 def summarize_residues(site_states: list[SiteState]) -> dict[tuple[str, int, str], ResidueVisualEncoding]:
     grouped: dict[tuple[str, int, str], list[SiteState]] = {}
     for state in site_states:
@@ -128,4 +133,3 @@ def _residue_key_from_pdb_line(line: str) -> tuple[str, int, str]:
     residue_number = int(line[22:26])
     insertion_code = line[26].strip()
     return (chain_id, residue_number, insertion_code)
-

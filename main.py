@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from mdprotonation.charge_colors import charge_color_band
 from mdprotonation.propka_analysis import PropkaAnalysis, run_propka_analysis
 from mdprotonation.pka_plot import create_pka_plot_figure
 from mdprotonation.protonation import (
@@ -61,26 +62,10 @@ def load_propka_analysis(pdb_text: str, filename: str) -> PropkaAnalysis:
 
 def style_site_table(row: pd.Series) -> list[str]:
     charge = float(row["Charge"])
-
-    # Inverted five-bin scale across charge:
-    # red -> pink -> white -> slate blue -> deep blue
-    if charge <= -0.75:
-        background = "#c62828"  # red
-        foreground = "#ffffff"
-    elif charge <= -0.25:
-        background = "#f6c1d6"  # pink
-        foreground = "#3f1025"
-    elif charge < 0.25:
-        background = "#ffffff"  # white
-        foreground = "#111827"
-    elif charge < 0.75:
-        background = "#6f82be"  # slate blue
-        foreground = "#ffffff"
-    else:
-        background = "#0d47a1"  # deep blue
-        foreground = "#ffffff"
-
-    return [f"background-color: {background}; color: {foreground}"] * len(row)
+    color_band = charge_color_band(charge)
+    return [
+        f"background-color: {color_band.background}; color: {color_band.foreground}"
+    ] * len(row)
 
 
 def selected_rows_from_selection(selection: object | None) -> list[int]:
@@ -354,9 +339,9 @@ def main() -> None:
             selected_state = responsive_selected_state
 
         st.caption(
-            "Row colors by charge (inverted scale): <= -0.75 red, "
+            "Row colors by charge: <= -0.75 red (electron-rich), "
             "(-0.75, -0.25] pink, (-0.25, +0.25) white, "
-            "[+0.25, +0.75) slate blue, >= +0.75 deep blue."
+            "[+0.25, +0.75) slate blue, >= +0.75 deep blue (electron-deficient)."
         )
         st.caption("`⚠️` marks sites not in their pH 7 dominant state.")
 
@@ -437,10 +422,10 @@ def main() -> None:
         pka_plot_figure = create_pka_plot_figure(site_states, ph)
         st.pyplot(pka_plot_figure, use_container_width=True)
         st.caption(
-            "Orange bars show the pH range where a site remains in its positively "
-            "charged state. Blue bars show the pH range where a site remains in its "
-            "deprotonated, negatively charged state. `(!)` marks sites transitioning "
-            "at the selected pH."
+            "The pKa lanes now use the same five charge bins as the Explorer table: "
+            "red, pink, white, slate blue, and deep blue. The solid vertical line "
+            "marks the selected pH, dashed lines mark `pH ± 1`, and `⚠️` marks sites "
+            "transitioning at the selected pH."
         )
 
     with propka_tab:

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from mdprotonation.pka_plot import (
-    NEGATIVE_RANGE_COLOR,
-    POSITIVE_RANGE_COLOR,
     build_pka_plot_rows,
 )
+from mdprotonation.charge_colors import charge_color_band
 from mdprotonation.propka_analysis import TitrationSite
 from mdprotonation.protonation import SiteState
 
@@ -62,13 +61,19 @@ def test_build_pka_plot_rows_formats_labels_and_charge_ranges() -> None:
 
     rows = build_pka_plot_rows([positive_state, negative_state])
 
-    assert [row.label for row in rows] == ["(!) A:12-ASP", "B:44A-LYS"]
-    assert rows[0].charged_range_start == 3.7
-    assert rows[0].charged_range_end == 14.0
-    assert rows[0].charged_range_color == NEGATIVE_RANGE_COLOR
-    assert rows[1].charged_range_start == 0.0
-    assert rows[1].charged_range_end == 10.5
-    assert rows[1].charged_range_color == POSITIVE_RANGE_COLOR
+    assert [row.label for row in rows] == ["⚠️ A:12-ASP", "B:44A-LYS"]
+    assert rows[0].charge_segments[0].color == charge_color_band(0.0).background
+    assert rows[0].charge_segments[-1].color == charge_color_band(-1.0).background
+    assert rows[1].charge_segments[0].color == charge_color_band(1.0).background
+    assert rows[1].charge_segments[-1].color == charge_color_band(0.0).background
+    assert any(
+        segment.color == charge_color_band(-0.5).background
+        for segment in rows[0].charge_segments
+    )
+    assert any(
+        segment.color == charge_color_band(0.5).background
+        for segment in rows[1].charge_segments
+    )
 
 
 def test_build_pka_plot_rows_clips_out_of_range_markers() -> None:
@@ -91,8 +96,8 @@ def test_build_pka_plot_rows_clips_out_of_range_markers() -> None:
 
     assert [row.label for row in rows] == ["A:18-ASP", "A:101-ARG"]
     assert rows[0].pka_marker == 0.22
-    assert rows[0].charged_range_start == 0.0
-    assert rows[0].charged_range_end == 14.0
+    assert rows[0].charge_segments[0].start_ph == 0.0
+    assert rows[0].charge_segments[-1].end_ph == 14.0
     assert rows[1].pka_marker == 13.78
-    assert rows[1].charged_range_start == 0.0
-    assert rows[1].charged_range_end == 14.0
+    assert rows[1].charge_segments[0].start_ph == 0.0
+    assert rows[1].charge_segments[-1].end_ph == 14.0
