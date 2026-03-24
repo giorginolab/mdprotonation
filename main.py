@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from mdprotonation.propka_analysis import PropkaAnalysis, run_propka_analysis
+from mdprotonation.pka_plot import create_pka_plot_figure
 from mdprotonation.protonation import (
     evaluate_sites,
     render_ph_encoded_pdb,
@@ -242,8 +243,8 @@ def main() -> None:
         ):
             responsive_selected_state = top_responsive_sites[responsive_selected_rows[0]]
 
-    overview_tab, profiles_tab, propka_tab = st.tabs(
-        ["Explorer", "Profiles", "PROPka Data"]
+    overview_tab, profiles_tab, pka_plot_tab, propka_tab = st.tabs(
+        ["Explorer", "Profiles", "pKa Plot", "PROPka Data"]
     )
 
     with overview_tab:
@@ -430,6 +431,17 @@ def main() -> None:
             )
         else:
             st.info("PROPka did not return a folding free-energy profile for this structure.")
+
+    with pka_plot_tab:
+        st.subheader("Residue pKa Landscape")
+        pka_plot_figure = create_pka_plot_figure(site_states, ph)
+        st.pyplot(pka_plot_figure, use_container_width=True)
+        st.caption(
+            "Orange bars show the pH range where a site remains in its positively "
+            "charged state. Blue bars show the pH range where a site remains in its "
+            "deprotonated, negatively charged state. `(!)` marks sites transitioning "
+            "at the selected pH."
+        )
 
     with propka_tab:
         st.subheader("PROPka Summary")
