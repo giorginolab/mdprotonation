@@ -17,9 +17,9 @@ NEGATIVE_RANGE_COLOR = NEGATIVE_CHARGE_HIGH_COLOR
 POSITIVE_RANGE_COLOR = POSITIVE_CHARGE_HIGH_COLOR
 
 CHARGE_SCALE_CAPTION = (
-    "Row colors by charge: <= -0.75 red (electron-rich), "
-    "(-0.75, -0.25] pink, (-0.25, +0.25) white, "
-    "[+0.25, +0.75) slate blue, >= +0.75 deep blue (electron-deficient)."
+    "Row colors by protonation class: acidic <10% prot red, acidic 10-90% prot pink, "
+    "acidic >90% or basic <10% prot white, basic 10-90% prot slate blue, "
+    "basic >90% prot deep blue."
 )
 PH7_STATE_CAPTION = f"`{TRANSITION_MARKER}` marks sites not in their pH 7 dominant state."
 VIEWER_ENCODING_CAPTION = (
@@ -27,9 +27,9 @@ VIEWER_ENCODING_CAPTION = (
     "titratable residue and B-factor stores transition intensity x100."
 )
 PKA_PLOT_CAPTION = (
-    "The pKa lanes use the same five charge bins as the Explorer table: red, "
-    "pink, white, slate blue, and deep blue. The solid vertical line marks the "
-    "selected pH, dashed lines mark `pH ± 1`, and "
+    "The pKa lanes use the same five acidic/basic protonation bins as the Explorer "
+    "table: red, pink, white, slate blue, and deep blue. The solid vertical line "
+    "marks the selected pH, dashed lines mark `pH ± 1`, and "
     f"`{TRANSITION_MARKER}` marks sites transitioning at the selected pH."
 )
 POSITIVE_RANGE_LABEL = "Positive charged range (electron-deficient)"
