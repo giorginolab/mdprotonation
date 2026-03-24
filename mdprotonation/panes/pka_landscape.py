@@ -11,7 +11,11 @@ def render_pka_plot_tab(app_state: AppState) -> None:
     st.subheader("Residue pKa Landscape")
     site_states = list(app_state.site_states)
     pka_plot_figure = create_pka_plot_figure(site_states, app_state.ph)
-    st.pyplot(pka_plot_figure, use_container_width=True)
+    st.plotly_chart(
+        pka_plot_figure,
+        use_container_width=True,
+        config={"displaylogo": False},
+    )
     st.caption(PKA_PLOT_CAPTION)
 
     st.divider()

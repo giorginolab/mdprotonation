@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "matplotlib>=3.10.8",
     "mdanalysis>=2.10.0",
+    "plotly>=6.6.0",
     "propka>=3.5.1",
     "streamlit>=1.55.0",
     "streamlit-molstar",

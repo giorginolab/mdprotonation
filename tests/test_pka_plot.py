@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from mdprotonation.pka_plot import (
     build_pka_plot_rows,
+    create_pka_plot_figure,
     create_pka_comparison_plot_figure,
 )
 from mdprotonation.charge_colors import charge_color_band
@@ -128,3 +129,32 @@ def test_create_pka_comparison_plot_figure_runs_without_error() -> None:
     figure = create_pka_comparison_plot_figure(states, current_ph=7.4)
     assert figure is not None
     assert len(figure.axes) == 2
+
+
+def test_create_pka_plot_figure_returns_plotly_figure() -> None:
+    states = [
+        make_site_state(
+            residue_type="LYS",
+            chain_id="A",
+            residue_number=1,
+            pka=10.5,
+            model_pka=10.0,
+            charged_state_charge=1.0,
+        ),
+        make_site_state(
+            residue_type="ASP",
+            chain_id="A",
+            residue_number=2,
+            pka=3.7,
+            model_pka=4.0,
+            charged_state_charge=-1.0,
+            dominant_state="Transitioning",
+        ),
+    ]
+
+    figure = create_pka_plot_figure(states, current_ph=7.4)
+
+    assert figure is not None
+    assert len(figure.data) >= 3
+    assert figure.layout.xaxis.title.text == "pKa"
+    assert figure.layout.yaxis.autorange == "reversed"

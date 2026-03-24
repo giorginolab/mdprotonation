@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
 from math import ceil
 
 from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
-from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
+import plotly.graph_objects as go
 
 from .app_state import site_state_sort_key
 from .charge_colors import charge_color_band, charge_legend_bands
@@ -20,15 +20,18 @@ LANE_EDGE_COLOR = "#d1d5db"
 CURRENT_PH_COLOR = "#3f3f46"
 TRANSITION_WINDOW_COLOR = "#6b7280"
 PH_SEGMENT_STEP = 0.1
+PLOT_FONT_FAMILY = "Avenir Next, Helvetica Neue, Arial, sans-serif"
 
 
 @dataclass(frozen=True)
 class PkaPlotRow:
     label: str
+    site_label: str
     pka: float
     pka_marker: float
     charge_segments: tuple["PkaPlotSegment", ...]
     is_transitioning: bool
+    dominant_state: str
 
 
 @dataclass(frozen=True)
@@ -36,6 +39,7 @@ class PkaPlotSegment:
     start_ph: float
     end_ph: float
     color: str
+    representative_charge: float
 
 
 def build_pka_plot_rows(site_states: list[SiteState]) -> list[PkaPlotRow]:
@@ -45,134 +49,165 @@ def build_pka_plot_rows(site_states: list[SiteState]) -> list[PkaPlotRow]:
         rows.append(
             PkaPlotRow(
                 label=_format_plot_label(state),
+                site_label=state.site.label,
                 pka=state.site.pka,
                 pka_marker=_clip_to_plot(state.site.pka, inset=0.22),
                 charge_segments=_build_charge_segments(state),
                 is_transitioning=state.dominant_state == "Transitioning",
+                dominant_state=state.dominant_state,
             )
         )
     return rows
 
 
-def create_pka_plot_figure(site_states: list[SiteState], current_ph: float) -> Figure:
+def create_pka_plot_figure(site_states: list[SiteState], current_ph: float) -> go.Figure:
     rows = build_pka_plot_rows(site_states)
-    figure_height = max(4.5, len(rows) * 0.34 + 1.4)
-    figure, axis = plt.subplots(figsize=(12.5, figure_height))
+    figure = go.Figure()
+    segment_buckets: dict[str, list[tuple[PkaPlotRow, PkaPlotSegment]]] = defaultdict(list)
+    category_order = [row.label for row in rows]
 
-    for index, row in enumerate(rows):
-        axis.barh(
-            index,
-            PH_MAX - PH_MIN,
-            left=PH_MIN,
-            height=0.82,
-            color="none",
-            edgecolor=LANE_EDGE_COLOR,
-            linewidth=0.7,
-            zorder=1,
-        )
+    for row in rows:
         for segment in row.charge_segments:
-            axis.barh(
-                index,
-                segment.end_ph - segment.start_ph,
-                left=segment.start_ph,
-                height=0.82,
-                color=segment.color,
-                edgecolor=segment.color,
-                linewidth=0.0,
-                zorder=2,
+            segment_buckets[segment.color].append((row, segment))
+
+    for band in charge_legend_bands():
+        entries = segment_buckets.get(band.color, [])
+        if not entries:
+            continue
+        figure.add_trace(
+            go.Bar(
+                name=band.label,
+                orientation="h",
+                x=[segment.end_ph - segment.start_ph for _, segment in entries],
+                base=[segment.start_ph for _, segment in entries],
+                y=[row.label for row, _ in entries],
+                width=0.82,
+                marker={
+                    "color": band.color,
+                    "line": {
+                        "color": LANE_EDGE_COLOR if band.color == LANE_COLOR else band.color,
+                        "width": 0.7 if band.color == LANE_COLOR else 0.0,
+                    },
+                },
+                customdata=[
+                    [
+                        row.site_label,
+                        row.pka,
+                        segment.start_ph,
+                        segment.end_ph,
+                        segment.representative_charge,
+                        row.dominant_state,
+                    ]
+                    for row, segment in entries
+                ],
+                hovertemplate=(
+                    "<b>%{customdata[0]}</b><br>"
+                    "pKa: %{customdata[1]:.2f}<br>"
+                    "pH range: %{customdata[2]:.2f} to %{customdata[3]:.2f}<br>"
+                    "Representative charge: %{customdata[4]:.2f}<br>"
+                    "State at selected pH: %{customdata[5]}<extra></extra>"
+                ),
             )
-        axis.text(
-            row.pka_marker,
-            index,
-            f"{row.pka:.2f}",
-            ha="center",
-            va="center",
-            fontsize=8,
-            color="#1f2937",
-            bbox={
-                "boxstyle": "round,pad=0.12",
-                "facecolor": "#f8fafc",
-                "edgecolor": "none",
-                "alpha": 0.72,
-            },
-            zorder=4,
+        )
+
+    for row in rows:
+        figure.add_annotation(
+            x=row.pka_marker,
+            y=row.label,
+            text=f"{row.pka:.2f}",
+            showarrow=False,
+            font={"size": 11, "color": "#1f2937", "family": PLOT_FONT_FAMILY},
+            bgcolor="rgba(248, 250, 252, 0.9)",
+            opacity=0.95,
+            borderpad=2,
         )
 
     for boundary in (current_ph - 1.0, current_ph + 1.0):
         if PH_MIN <= boundary <= PH_MAX:
-            axis.axvline(
-                boundary,
-                color=TRANSITION_WINDOW_COLOR,
-                linewidth=1.6,
-                alpha=0.55,
-                linestyle="--",
-                zorder=4,
+            figure.add_vline(
+                x=boundary,
+                line_color=TRANSITION_WINDOW_COLOR,
+                line_width=1.6,
+                line_dash="dash",
+                opacity=0.55,
             )
-    axis.axvline(
-        current_ph,
-        color=CURRENT_PH_COLOR,
-        linewidth=2.4,
-        alpha=0.92,
-        zorder=5,
-    )
-    axis.set_xlim(PH_MIN, PH_MAX)
-    axis.set_ylim(-0.8, len(rows) - 0.2)
-    axis.set_yticks(range(len(rows)))
-    axis.set_yticklabels([row.label for row in rows], fontsize=9)
-    axis.invert_yaxis()
-
-    axis.xaxis.tick_top()
-    axis.xaxis.set_label_position("top")
-    axis.set_xlabel("pKa", fontsize=12)
-    axis.set_xticks(range(0, 15, 2))
-    axis.set_xticks(range(0, 15), minor=True)
-    axis.grid(axis="x", which="major", color="#374151", alpha=0.24, linewidth=1.0)
-    axis.grid(
-        axis="x",
-        which="minor",
-        color="#6b7280",
-        alpha=0.18,
-        linestyle="--",
-        linewidth=0.8,
-    )
-    axis.tick_params(axis="y", length=0)
-    axis.tick_params(axis="x", labelsize=10)
-
-    for spine_name in ("left", "right", "bottom"):
-        axis.spines[spine_name].set_visible(False)
-    axis.spines["top"].set_color("#6b7280")
-    axis.spines["top"].set_linewidth(1.0)
-
-    legend_handles = [
-        Patch(facecolor=band.color, edgecolor=LANE_EDGE_COLOR, label=band.label)
-        for band in charge_legend_bands()
-    ] + [
-        Line2D(
-            [0],
-            [0],
-            color=CURRENT_PH_COLOR,
-            linewidth=2.4,
-            label=f"Selected pH {current_ph:.1f}",
-        ),
-        Line2D(
-            [0],
-            [0],
-            color=TRANSITION_WINDOW_COLOR,
-            linewidth=1.6,
-            linestyle="--",
-            label=TRANSITION_WINDOW_LABEL,
-        ),
-    ]
-    axis.legend(
-        handles=legend_handles,
-        loc="lower center",
-        bbox_to_anchor=(0.5, 1.02),
-        ncol=4,
-        frameon=False,
-        fontsize=9,
+    figure.add_vline(
+        x=current_ph,
+        line_color=CURRENT_PH_COLOR,
+        line_width=2.4,
+        opacity=0.92,
     )
 
-    figure.tight_layout()
+    figure.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="lines",
+            name=f"Selected pH {current_ph:.1f}",
+            line={"color": CURRENT_PH_COLOR, "width": 2.4},
+            hoverinfo="skip",
+        )
+    )
+    figure.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="lines",
+            name=TRANSITION_WINDOW_LABEL,
+            line={"color": TRANSITION_WINDOW_COLOR, "width": 1.6, "dash": "dash"},
+            hoverinfo="skip",
+        )
+    )
+
+    figure.update_layout(
+        barmode="overlay",
+        bargap=0.18,
+        height=max(540, 170 + (len(rows) * 28)),
+        margin={"l": 24, "r": 24, "t": 132, "b": 28},
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#fcfbf8",
+        font={"family": PLOT_FONT_FAMILY, "size": 14, "color": "#111827"},
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.1,
+            "xanchor": "left",
+            "x": 0.0,
+            "font": {"size": 13},
+        },
+        hovermode="closest",
+        hoverlabel={
+            "bgcolor": "#ffffff",
+            "bordercolor": "#d1d5db",
+            "font": {"family": PLOT_FONT_FAMILY, "size": 13, "color": "#111827"},
+        },
+    )
+    figure.update_xaxes(
+        range=[PH_MIN, PH_MAX],
+        side="top",
+        title_text="pKa",
+        title_font={"size": 20},
+        dtick=2,
+        tick0=0,
+        tickfont={"size": 14},
+        showgrid=True,
+        gridcolor="rgba(55, 65, 81, 0.24)",
+        gridwidth=1.1,
+        showline=True,
+        linecolor="#9ca3af",
+        linewidth=1.0,
+        zeroline=False,
+        minor={"dtick": 1, "showgrid": True, "gridcolor": "rgba(107, 114, 128, 0.18)"},
+    )
+    figure.update_yaxes(
+        autorange="reversed",
+        categoryorder="array",
+        categoryarray=category_order,
+        showgrid=False,
+        ticks="",
+        tickfont={"size": 14},
+        automargin=True,
+    )
     return figure
 
 
@@ -189,26 +224,28 @@ def _format_plot_label(state: SiteState) -> str:
 def _build_charge_segments(state: SiteState) -> tuple[PkaPlotSegment, ...]:
     segments: list[PkaPlotSegment] = []
     current_start = PH_MIN
-    current_color = charge_color_band(
-        site_charge_at_ph(state.site, PH_MIN + (PH_SEGMENT_STEP / 2.0))
-    ).background
+    current_charge = site_charge_at_ph(state.site, PH_MIN + (PH_SEGMENT_STEP / 2.0))
+    current_color = charge_color_band(current_charge).background
 
     ph = PH_MIN
     while ph < PH_MAX:
         start_ph = ph
         end_ph = min(ph + PH_SEGMENT_STEP, PH_MAX)
         midpoint = start_ph + ((end_ph - start_ph) / 2.0)
-        color = charge_color_band(site_charge_at_ph(state.site, midpoint)).background
+        midpoint_charge = site_charge_at_ph(state.site, midpoint)
+        color = charge_color_band(midpoint_charge).background
         if color != current_color:
             segments.append(
                 PkaPlotSegment(
                     start_ph=current_start,
                     end_ph=start_ph,
                     color=current_color,
+                    representative_charge=current_charge,
                 )
             )
             current_start = start_ph
             current_color = color
+            current_charge = midpoint_charge
         ph = end_ph
 
     segments.append(
@@ -216,6 +253,7 @@ def _build_charge_segments(state: SiteState) -> tuple[PkaPlotSegment, ...]:
             start_ph=current_start,
             end_ph=PH_MAX,
             color=current_color,
+            representative_charge=current_charge,
         )
     )
     return tuple(segments)
