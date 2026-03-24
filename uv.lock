@@ -555,7 +555,7 @@ requires-dist = [
     { name = "mdanalysis", specifier = ">=2.10.0" },
     { name = "propka", specifier = ">=3.5.1" },
     { name = "streamlit", specifier = ">=1.55.0" },
-    { name = "streamlit-molstar", specifier = ">=0.4.21" },
+    { name = "streamlit-molstar", directory = "mdprotonation/vendor/streamlit-molstar" },
 ]
 
 [[package]]
@@ -1081,13 +1081,19 @@ wheels = [
 [[package]]
 name = "streamlit-molstar"
 version = "0.4.21"
-source = { registry = "https://pypi.org/simple" }
+source = { directory = "mdprotonation/vendor/streamlit-molstar" }
 dependencies = [
     { name = "mrcfile" },
     { name = "numpy" },
     { name = "streamlit" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1d/41/c7a6939e9c400ba9874dfd8abbfcae17d8e8228cc43a4370098577319c11/streamlit-molstar-0.4.21.tar.gz", hash = "sha256:65ebbc554e163455685dd96e39ca503e7c2af76bab7a61ccce25e43fae0f1b40", size = 35205127, upload-time = "2024-01-18T13:00:14.461Z" }
+
+[package.metadata]
+requires-dist = [
+    { name = "mrcfile" },
+    { name = "numpy" },
+    { name = "streamlit" },
+]
 
 [[package]]
 name = "tenacity"

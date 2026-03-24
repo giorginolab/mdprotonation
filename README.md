@@ -18,9 +18,13 @@ Live demo: [Hugging Face Space](https://huggingface.co/spaces/tonigi/pkaScope)
 This repository uses `uv` for Python workflows.
 
 ```bash
+git clone --recurse-submodules git@github.com:giorginolab/pkaScope.git
+cd pkaScope
 uv sync
 uv run streamlit run main.py
 ```
+
+If you already cloned the repository without submodules, run `git submodule update --init --recursive` once before `uv sync`.
 
 Then open the local Streamlit URL shown in the terminal.
 
