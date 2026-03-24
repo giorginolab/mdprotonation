@@ -20,13 +20,11 @@ This repository uses `uv` for Python workflows.
 ```bash
 git clone --recurse-submodules git@github.com:giorginolab/pkaScope.git
 cd pkaScope
-export NODE_OPTIONS=--openssl-legacy-provider
-cd mdprotonation/vendor/streamlit-molstar && bash build.sh && cd ../../..
 uv sync
 uv run streamlit run main.py
 ```
 
-If you already cloned the repository without submodules, run `git submodule update --init --recursive` once before building the vendored `streamlit-molstar` frontend and running `uv sync`.
+If you already cloned the repository without submodules, run `git submodule update --init --recursive` once before `uv sync`.
 
 Then open the local Streamlit URL shown in the terminal.
 
