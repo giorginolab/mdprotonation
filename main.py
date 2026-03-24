@@ -66,7 +66,8 @@ def main() -> None:
     st.title("Protein Protonation Explorer")
     st.caption(
         "Explore continuous residue protonation as a function of pH using "
-        "[PROPKA](https://github.com/jensengroup/propka)."
+        "[PROPKA](https://github.com/jensengroup/propka). "
+        "[giorginolab.it](https://www.giorginolab.it)"
     )
 
     with st.sidebar:
@@ -157,6 +158,13 @@ def main() -> None:
 
     with propka_tab:
         render_propka_data_tab(analysis)
+
+    st.divider()
+    st.markdown(
+        "Created by [Toni Giorgino](https://www.giorginolab.it) | AI coded | "
+        "[GitHub](https://github.com/giorginolab/pkaScope#) | "
+        "[Hugging Face Space](https://huggingface.co/spaces/tonigi/pkaScope)"
+    )
 
 
 if __name__ == "__main__":

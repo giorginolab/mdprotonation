@@ -2,6 +2,8 @@
 
 `mdprotonation` is a Streamlit web app for exploring protein protonation states as a function of pH. It runs [PROPka](https://github.com/jensengroup/propka) through its Python API, computes continuous protonation fractions for titratable sites, and exposes the result through an interactive structure viewer and residue tables.
 
+Live demo: [Hugging Face Space](https://huggingface.co/spaces/tonigi/pkaScope)
+
 ## Current Features
 
 - Load an example PDB from [`examples/`](/Users/toni/work/mdprotonation/examples), upload a local `.pdb` file, or fetch a structure by RCSB PDB ID.

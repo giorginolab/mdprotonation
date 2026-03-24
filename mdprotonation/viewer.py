@@ -10,7 +10,7 @@ from .pdb_utils import ResidueKey, parse_pdb_atoms
 
 _COMPONENT_FUNC = components.declare_component(
     "mdprotonation_molstar",
-    path=str(Path(__file__).resolve().parent / "vendor" / "streamlit_molstar_build"),
+    path=str(Path(__file__).resolve().parent / "vendor" / "streamlit-molstar" / "streamlit_molstar" / "frontend" / "build"),
 )
 
 
