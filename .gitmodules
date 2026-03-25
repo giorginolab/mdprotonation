@@ -1,3 +1,6 @@
 [submodule "mdprotonation/vendor/streamlit-molstar"]
 	path = pkaScope/vendor/streamlit-molstar
 	url = https://github.com/giorginolab/streamlit-molstar.git
+[submodule "hf_space"]
+	path = hf_space
+	url = git@hf.co:spaces/tonigi/pkaScope
