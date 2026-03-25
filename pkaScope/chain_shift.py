@@ -65,15 +65,27 @@ def list_chain_ids(pdb_text: str) -> tuple[str, ...]:
 
 
 def extract_chain_pdb(pdb_text: str, chain_id: str) -> str:
+    return extract_chains_pdb(pdb_text, (chain_id,))
+
+
+def extract_chains_pdb(pdb_text: str, chain_ids: Iterable[str]) -> str:
     universe = load_pdb_universe(pdb_text)
-    normalized_chain_id = _normalize_chain_id(chain_id)
+    normalized_chain_ids = tuple(
+        dict.fromkeys(_normalize_chain_id(chain_id) for chain_id in chain_ids)
+    )
+    if not normalized_chain_ids:
+        raise ValueError("At least one chain must be selected.")
+    selected_chain_ids = frozenset(normalized_chain_ids)
     selected_atom_indices = [
         atom.index
         for atom in universe.atoms
-        if atom_residue_key(atom)[0] == normalized_chain_id
+        if atom_residue_key(atom)[0] in selected_chain_ids
     ]
     if not selected_atom_indices:
-        raise ValueError(f"Chain '{normalized_chain_id}' has no coordinate records.")
+        selected_chain_display = ", ".join(normalized_chain_ids)
+        raise ValueError(
+            f"Selected chains ({selected_chain_display}) have no coordinate records."
+        )
     return write_pdb_atoms(universe.atoms[selected_atom_indices])
 
 
@@ -92,6 +104,33 @@ def compare_chain_pkas(
     )
     if not monomer_chain_sites:
         monomer_chain_sites = tuple(monomer_sites)
+
+    return _compare_site_collections(
+        chain_id=normalized_chain_id,
+        complex_chain_sites=complex_chain_sites,
+        monomer_chain_sites=monomer_chain_sites,
+    )
+
+
+def compare_site_sets_pkas(
+    *,
+    comparison_label: str,
+    complex_sites: Iterable[TitrationSite],
+    monomer_sites: Iterable[TitrationSite],
+) -> ChainPkaComparison:
+    return _compare_site_collections(
+        chain_id=comparison_label.strip() or "Custom",
+        complex_chain_sites=tuple(complex_sites),
+        monomer_chain_sites=tuple(monomer_sites),
+    )
+
+
+def _compare_site_collections(
+    *,
+    chain_id: str,
+    complex_chain_sites: tuple[TitrationSite, ...],
+    monomer_chain_sites: tuple[TitrationSite, ...],
+) -> ChainPkaComparison:
 
     remaining_monomer_by_site_key = _group_sites_by_site_key(monomer_chain_sites)
     remaining_monomer_by_match_key = _group_sites_by_match_key(monomer_chain_sites)
@@ -137,7 +176,7 @@ def compare_chain_pkas(
     )
 
     return ChainPkaComparison(
-        chain_id=normalized_chain_id,
+        chain_id=chain_id,
         shifts=tuple(sorted(shifts, key=_shift_sort_key)),
         unmatched_complex_labels=tuple(sorted(unmatched_complex_labels)),
         unmatched_monomer_labels=tuple(unmatched_monomer_labels),

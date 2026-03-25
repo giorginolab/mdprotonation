@@ -9,8 +9,9 @@ from ..app_state import AppState
 from ..chain_shift import (
     ChainPkaShift,
     compare_chain_pkas,
+    compare_site_sets_pkas,
     create_chain_shift_plot_figure,
-    extract_chain_pdb,
+    extract_chains_pdb,
     list_chain_ids,
     top_shift_residue_keys,
 )
@@ -24,19 +25,25 @@ from ..viewer import (
 
 SHIFT_VIEWER_HEIGHT = 620
 SHIFT_TABLE_HEIGHT = 380
-CHAIN_COMPARE_SCHEMA_VERSION = "2026-03-24-chain-compare-v1"
+CHAIN_COMPARE_SCHEMA_VERSION = "2026-03-25-chain-compare-v2"
+CHAIN_ROLE_IGNORE = "Ignore"
+CHAIN_ROLE_COMPLEX = "In complex"
+CHAIN_ROLE_MONOMER = "In monomer"
+CHAIN_ROLE_OPTIONS = (CHAIN_ROLE_IGNORE, CHAIN_ROLE_COMPLEX, CHAIN_ROLE_MONOMER)
 
 
 @st.cache_data(show_spinner=False)
-def cached_chain_monomer_analysis(
+def cached_chain_set_analysis(
     pdb_text: str,
     source_name: str,
-    chain_id: str,
+    chain_ids: tuple[str, ...],
+    set_label: str,
     schema_version: str,
 ) -> PropkaAnalysis:
     del schema_version
-    chain_pdb_text = extract_chain_pdb(pdb_text, chain_id)
-    chain_source_name = f"{Path(source_name).stem}-chain-{chain_id}.pdb"
+    chain_pdb_text = extract_chains_pdb(pdb_text, chain_ids)
+    chain_token = "-".join(_chain_id_token(chain_id) for chain_id in chain_ids)
+    chain_source_name = f"{Path(source_name).stem}-{set_label}-{chain_token}.pdb"
     return run_propka_analysis(chain_pdb_text, chain_source_name)
 
 
@@ -57,37 +64,102 @@ def render_chain_shift_tab(
         st.info("No chain IDs were found in this structure.")
         return
 
-    selected_chain = st.selectbox(
-        "Select chain",
-        options=chain_ids,
-        key="chain-shift-chain-select",
+    advanced_mode = st.checkbox(
+        "Enable advanced chain selection",
+        value=False,
+        key="chain-shift-advanced-mode",
     )
 
-    try:
-        with st.spinner(f"Running chain-only PROPKA for chain {selected_chain}..."):
-            monomer_analysis = cached_chain_monomer_analysis(
-                analysis.pdb_text,
-                analysis.source_name,
-                selected_chain,
-                CHAIN_COMPARE_SCHEMA_VERSION,
-            )
-    except Exception as exc:
-        st.error(
-            f"Chain-only PROPKA failed for chain {selected_chain}. "
-            "The comparison view could not be assembled."
+    if advanced_mode:
+        st.caption(
+            "Assign each chain to one side. Chains marked as `Ignore` are excluded "
+            "from both PROPKA calculations."
         )
-        st.exception(exc)
-        return
+        chain_roles = _collect_chain_roles(chain_ids)
+        complex_chain_ids = tuple(
+            chain_id
+            for chain_id in chain_ids
+            if chain_roles.get(chain_id) == CHAIN_ROLE_COMPLEX
+        )
+        monomer_chain_ids = tuple(
+            chain_id
+            for chain_id in chain_ids
+            if chain_roles.get(chain_id) == CHAIN_ROLE_MONOMER
+        )
+        st.caption(f"Complex set: `{_chain_set_label(complex_chain_ids)}`")
+        st.caption(f"Monomer set: `{_chain_set_label(monomer_chain_ids)}`")
+        if not complex_chain_ids or not monomer_chain_ids:
+            st.warning(
+                "Select at least one chain in `In complex` and one chain in `In monomer` "
+                "to run the comparison."
+            )
+            return
+        try:
+            with st.spinner("Running PROPKA for selected chain sets..."):
+                complex_analysis = cached_chain_set_analysis(
+                    analysis.pdb_text,
+                    analysis.source_name,
+                    complex_chain_ids,
+                    "complex",
+                    CHAIN_COMPARE_SCHEMA_VERSION,
+                )
+                monomer_analysis = cached_chain_set_analysis(
+                    analysis.pdb_text,
+                    analysis.source_name,
+                    monomer_chain_ids,
+                    "monomer",
+                    CHAIN_COMPARE_SCHEMA_VERSION,
+                )
+        except Exception as exc:
+            st.error(
+                "Chain-set PROPKA failed for the advanced selection. "
+                "The comparison view could not be assembled."
+            )
+            st.exception(exc)
+            return
+        comparison = compare_site_sets_pkas(
+            comparison_label="Advanced chain selection",
+            complex_sites=complex_analysis.titration_sites,
+            monomer_sites=monomer_analysis.titration_sites,
+        )
+        comparison_scope_key = (
+            f"advanced-{_chain_set_key(complex_chain_ids)}-vs-{_chain_set_key(monomer_chain_ids)}"
+        )
+    else:
+        selected_chain = st.selectbox(
+            "Select chain",
+            options=chain_ids,
+            key="chain-shift-chain-select",
+        )
 
-    comparison = compare_chain_pkas(
-        chain_id=selected_chain,
-        complex_sites=analysis.titration_sites,
-        monomer_sites=monomer_analysis.titration_sites,
-    )
+        try:
+            with st.spinner(f"Running chain-only PROPKA for chain {selected_chain}..."):
+                monomer_analysis = cached_chain_set_analysis(
+                    analysis.pdb_text,
+                    analysis.source_name,
+                    (selected_chain,),
+                    "monomer",
+                    CHAIN_COMPARE_SCHEMA_VERSION,
+                )
+        except Exception as exc:
+            st.error(
+                f"Chain-only PROPKA failed for chain {selected_chain}. "
+                "The comparison view could not be assembled."
+            )
+            st.exception(exc)
+            return
+
+        comparison = compare_chain_pkas(
+            chain_id=selected_chain,
+            complex_sites=analysis.titration_sites,
+            monomer_sites=monomer_analysis.titration_sites,
+        )
+        comparison_scope_key = selected_chain
+
     if not comparison.shifts:
         st.info(
-            "No matched titratable sites were found for the selected chain between "
-            "complex and monomer calculations."
+            "No matched titratable sites were found between "
+            "the selected complex and monomer calculations."
         )
         return
 
@@ -116,7 +188,7 @@ def render_chain_shift_tab(
         subset=["|Delta pKa|"],
         cmap="Reds",
     )
-    table_key = f"chain-shift-table-{selected_chain}"
+    table_key = f"chain-shift-table-{comparison_scope_key}"
     table_event = st.dataframe(
         styled_shift_df,
         hide_index=True,
@@ -139,7 +211,7 @@ def render_chain_shift_tab(
     st.subheader("3D Shift Hot Spots")
     st.caption(
         "The viewer loads the full complex and automatically focuses on "
-        "the highest-shift site. Select a table row to inspect another hot spot."
+        "the first listed site. Select a table row to inspect another hot spot."
     )
     st_molstar_focusable_content(
         analysis.pdb_text,
@@ -147,7 +219,7 @@ def render_chain_shift_tab(
         file_name=f"{app_state.analysis.structure_name}-complex.pdb",
         focus_residue=focus_residue,
         height=f"{SHIFT_VIEWER_HEIGHT}px",
-        key=f"chain-shift-viewer-{app_state.analysis.structure_name}-{selected_chain}",
+        key=f"chain-shift-viewer-{app_state.analysis.structure_name}-{comparison_scope_key}",
     )
     st.caption(
         f"Focused site: `{selected_shift.residue_label}` "
@@ -200,6 +272,46 @@ def _site_column_label(shift: ChainPkaShift) -> str:
         else f"{shift.residue_number:>5}"
     )
     return f"{shift.chain_id}:{residue_token}-{shift.residue_type}"
+
+
+def _collect_chain_roles(chain_ids: tuple[str, ...]) -> dict[str, str]:
+    roles: dict[str, str] = {}
+    for index, chain_id in enumerate(chain_ids):
+        roles[chain_id] = st.selectbox(
+            f"Chain {_chain_display_label(chain_id)}",
+            options=CHAIN_ROLE_OPTIONS,
+            key=f"chain-shift-advanced-role-{chain_id}",
+            index=_default_chain_role_index(index),
+        )
+    return roles
+
+
+def _default_chain_role_index(chain_index: int) -> int:
+    if chain_index == 0:
+        return CHAIN_ROLE_OPTIONS.index(CHAIN_ROLE_COMPLEX)
+    if chain_index == 1:
+        return CHAIN_ROLE_OPTIONS.index(CHAIN_ROLE_MONOMER)
+    return CHAIN_ROLE_OPTIONS.index(CHAIN_ROLE_IGNORE)
+
+
+def _chain_set_label(chain_ids: tuple[str, ...]) -> str:
+    if not chain_ids:
+        return "(none)"
+    return ", ".join(_chain_display_label(chain_id) for chain_id in chain_ids)
+
+
+def _chain_set_key(chain_ids: tuple[str, ...]) -> str:
+    if not chain_ids:
+        return "none"
+    return "-".join(_chain_id_token(chain_id) for chain_id in chain_ids)
+
+
+def _chain_display_label(chain_id: str) -> str:
+    return chain_id if chain_id != "?" else "(blank)"
+
+
+def _chain_id_token(chain_id: str) -> str:
+    return "blank" if chain_id == "?" else chain_id
 
 
 def _resolve_focus_target(

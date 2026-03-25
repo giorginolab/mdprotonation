@@ -4,7 +4,9 @@ import pytest
 
 from pkaScope.chain_shift import (
     compare_chain_pkas,
+    compare_site_sets_pkas,
     extract_chain_pdb,
+    extract_chains_pdb,
     list_chain_ids,
     top_shift_residue_keys,
 )
@@ -61,6 +63,23 @@ def test_extract_chain_pdb_filters_coordinate_records_for_selected_chain() -> No
     assert "ASP A  12" not in extracted_pdb
 
 
+def test_extract_chains_pdb_filters_coordinate_records_for_selected_chains() -> None:
+    pdb_text = (
+        "HEADER    TEST\n"
+        "ATOM      1  N   ASP A  12      10.000  11.000  12.000  1.00 20.00           N\n"
+        "ATOM      2  N   GLU B  42      13.000  14.000  15.000  1.00 20.00           N\n"
+        "ATOM      3  N   LYS C  55      11.000  12.000  13.000  1.00 20.00           N\n"
+        "TER\n"
+        "END\n"
+    )
+
+    extracted_pdb = extract_chains_pdb(pdb_text, ("A", "C"))
+
+    assert "ASP A  12" in extracted_pdb
+    assert "LYS C  55" in extracted_pdb
+    assert "GLU B  42" not in extracted_pdb
+
+
 def test_compare_chain_pkas_matches_by_residue_key_when_chain_ids_change() -> None:
     complex_sites = (
         _make_site(
@@ -109,3 +128,49 @@ def test_compare_chain_pkas_matches_by_residue_key_when_chain_ids_change() -> No
     assert top_shift_residue_keys(comparison.shifts, minimum_absolute_delta=0.7) == (
         ("A", 10, ""),
     )
+
+
+def test_compare_site_sets_pkas_compares_multiple_chains() -> None:
+    complex_sites = (
+        _make_site(
+            label="ASP  10 A",
+            residue_type="ASP",
+            chain_id="A",
+            residue_number=10,
+            pka=4.2,
+        ),
+        _make_site(
+            label="GLU  30 B",
+            residue_type="GLU",
+            chain_id="B",
+            residue_number=30,
+            pka=5.4,
+        ),
+    )
+    monomer_sites = (
+        _make_site(
+            label="ASP  10 A",
+            residue_type="ASP",
+            chain_id="A",
+            residue_number=10,
+            pka=4.8,
+        ),
+        _make_site(
+            label="GLU  30 B",
+            residue_type="GLU",
+            chain_id="B",
+            residue_number=30,
+            pka=4.9,
+        ),
+    )
+
+    comparison = compare_site_sets_pkas(
+        comparison_label="Advanced chain selection",
+        complex_sites=complex_sites,
+        monomer_sites=monomer_sites,
+    )
+
+    assert comparison.chain_id == "Advanced chain selection"
+    assert len(comparison.shifts) == 2
+    assert comparison.shifts[0].delta_pka == pytest.approx(-0.6)
+    assert comparison.shifts[1].delta_pka == pytest.approx(0.5)
