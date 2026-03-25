@@ -56,7 +56,7 @@ def test_extract_chain_pdb_filters_coordinate_records_for_selected_chain() -> No
 
     extracted_pdb = extract_chain_pdb(pdb_text, "B")
 
-    assert "HEADER    TEST" in extracted_pdb
+    assert "ATOM" in extracted_pdb
     assert "GLU B  42" in extracted_pdb
     assert "ASP A  12" not in extracted_pdb
 

@@ -8,10 +8,9 @@ from typing import Iterable
 from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
 
-from .pdb_utils import ResidueKey
+from .pdb_utils import ResidueKey, atom_residue_key, load_pdb_universe, write_pdb_atoms
 from .propka_analysis import TitrationSite
 
-CoordinateRecordPrefix = ("ATOM  ", "HETATM", "ANISOU", "TER   ")
 SiteMatchKey = tuple[int, str, str]
 
 
@@ -57,30 +56,25 @@ class ChainPkaComparison:
 
 
 def list_chain_ids(pdb_text: str) -> tuple[str, ...]:
+    universe = load_pdb_universe(pdb_text)
     ordered_chain_ids: dict[str, None] = {}
-    for line in pdb_text.splitlines():
-        if not line.startswith(CoordinateRecordPrefix):
-            continue
-        chain_id = _line_chain_id(line)
+    for atom in universe.atoms:
+        chain_id = atom_residue_key(atom)[0]
         ordered_chain_ids.setdefault(chain_id, None)
     return tuple(ordered_chain_ids.keys())
 
 
 def extract_chain_pdb(pdb_text: str, chain_id: str) -> str:
+    universe = load_pdb_universe(pdb_text)
     normalized_chain_id = _normalize_chain_id(chain_id)
-    extracted_lines: list[str] = []
-    matched_coordinate_lines = 0
-
-    for line in pdb_text.splitlines(keepends=True):
-        if line.startswith(CoordinateRecordPrefix):
-            if _line_chain_id(line) != normalized_chain_id:
-                continue
-            matched_coordinate_lines += 1
-        extracted_lines.append(line)
-
-    if matched_coordinate_lines == 0:
+    selected_atom_indices = [
+        atom.index
+        for atom in universe.atoms
+        if atom_residue_key(atom)[0] == normalized_chain_id
+    ]
+    if not selected_atom_indices:
         raise ValueError(f"Chain '{normalized_chain_id}' has no coordinate records.")
-    return "".join(extracted_lines)
+    return write_pdb_atoms(universe.atoms[selected_atom_indices])
 
 
 def compare_chain_pkas(
@@ -274,12 +268,6 @@ def create_chain_shift_plot_figure(
 
 def _normalize_chain_id(chain_id: str) -> str:
     return chain_id.strip() or "?"
-
-
-def _line_chain_id(line: str) -> str:
-    if len(line) < 22:
-        return "?"
-    return _normalize_chain_id(line[21:22])
 
 
 def _group_sites_by_site_key(

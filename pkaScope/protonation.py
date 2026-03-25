@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from math import exp
 from statistics import mean
 
-from .pdb_utils import parse_pdb_atoms
+from .pdb_utils import atom_residue_key, load_pdb_universe, write_pdb_atoms
 from .propka_analysis import TitrationSite
 
 
@@ -96,27 +96,22 @@ def render_ph_encoded_pdb(
     pdb_text: str,
     residue_encodings: dict[tuple[str, int, str], ResidueVisualEncoding],
 ) -> str:
+    universe = load_pdb_universe(pdb_text)
+    for atom in universe.atoms:
+        residue_key = atom_residue_key(atom)
+        encoding = residue_encodings.get(residue_key)
+        if encoding is None:
+            continue
+        occupancy = min(max(encoding.average_protonated_fraction, 0.0), 1.0)
+        b_factor = min(max(encoding.transition_intensity * 100.0, 0.0), 100.0)
+        atom.occupancy = occupancy
+        atom.tempfactor = b_factor
+
     encoded_lines = [
         "REMARK 950 OCCUPANCY STORES AVERAGE PROTONATED FRACTION (0.00-1.00)\n",
         "REMARK 950 B-FACTOR STORES TRANSITION INTENSITY * 100 (0.00-100.00)\n",
+        write_pdb_atoms(universe.atoms),
     ]
-    parsed_atoms = iter(parse_pdb_atoms(pdb_text))
-
-    for line in pdb_text.splitlines(keepends=True):
-        if line.startswith(("ATOM  ", "HETATM")):
-            parsed_atom = next(parsed_atoms, None)
-            if parsed_atom is None:
-                encoded_lines.append(line)
-                continue
-            residue_key = parsed_atom.residue_key
-            encoding = residue_encodings.get(residue_key)
-            if encoding is not None:
-                occupancy = min(max(encoding.average_protonated_fraction, 0.0), 1.0)
-                b_factor = min(max(encoding.transition_intensity * 100.0, 0.0), 100.0)
-                prefix = line[:54].ljust(54)
-                suffix = line[66:] if len(line) > 66 else "\n"
-                line = f"{prefix}{occupancy:6.2f}{b_factor:6.2f}{suffix}"
-        encoded_lines.append(line)
     return "".join(encoded_lines)
 
 
