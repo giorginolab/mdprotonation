@@ -1,6 +1,11 @@
 # pkaScope
 
-`pkaScope` is a Streamlit web app for exploring protein protonation states as a function of pH. It runs [PROPka](https://github.com/jensengroup/propka) through its Python API, computes continuous protonation fractions for titratable sites, and exposes the result through an interactive structure viewer and residue tables.
+`pkaScope` is a Streamlit web app for exploring protein protonation
+states as a function of pH. It runs
+[PROPka](https://github.com/jensengroup/propka) through its Python API,
+computes continuous protonation fractions for titratable sites, and
+exposes the result through an interactive structure viewer and residue
+tables.
 
 Live demo: [Hugging Face Space](https://huggingface.co/spaces/tonigi/pkaScope)
 
@@ -30,20 +35,12 @@ Then open the local Streamlit URL shown in the terminal.
 
 ## How the First Viewer Version Works
 
-The current viewer uses `streamlit-molstar` to render the structure. That component does not yet expose a convenient Python-side API for per-residue coloring or selection, so the app currently rewrites the loaded PDB before display:
+The current viewer uses a modified `streamlit-molstar` to render the
+structure. That component does not yet expose a convenient Python-side
+API for per-residue coloring or selection, so the app currently rewrites
+the loaded PDB before display:
 
 - occupancy stores the average protonated fraction for each titratable residue
 - B-factor stores transition intensity scaled to `0-100`
 
 This keeps the pH-dependent state available in the structure artifact now, while leaving room for richer visual styling later.
-
-## Project Layout
-
-- [`main.py`](/Users/toni/work/pkaScope/main.py): Streamlit app entrypoint
-- [`pkaScope/propka_analysis.py`](/Users/toni/work/pkaScope/pkaScope/propka_analysis.py): PROPka execution and result extraction
-- [`pkaScope/protonation.py`](/Users/toni/work/pkaScope/pkaScope/protonation.py): pH-dependent protonation and viewer encoding logic
-- [`examples/7bcq.pdb`](/Users/toni/work/pkaScope/examples/7bcq.pdb): example structure for local testing
-
-## Next Steps
-
-Planned additions include richer Mol* residue highlighting, chain and residue filters, structured PROPka tables, and additional panes for deeper inspection of PROPka outputs.
