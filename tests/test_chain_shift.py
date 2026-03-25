@@ -174,3 +174,85 @@ def test_compare_site_sets_pkas_compares_multiple_chains() -> None:
     assert len(comparison.shifts) == 2
     assert comparison.shifts[0].delta_pka == pytest.approx(-0.6)
     assert comparison.shifts[1].delta_pka == pytest.approx(0.5)
+
+
+def test_compare_site_sets_pkas_sorts_shifts_by_chain_then_residue() -> None:
+    complex_sites = (
+        _make_site(
+            label="GLU   5 B",
+            residue_type="GLU",
+            chain_id="B",
+            residue_number=5,
+            pka=5.3,
+        ),
+        _make_site(
+            label="ASP  40 A",
+            residue_type="ASP",
+            chain_id="A",
+            residue_number=40,
+            pka=4.4,
+        ),
+    )
+    monomer_sites = (
+        _make_site(
+            label="GLU   5 B",
+            residue_type="GLU",
+            chain_id="B",
+            residue_number=5,
+            pka=5.0,
+        ),
+        _make_site(
+            label="ASP  40 A",
+            residue_type="ASP",
+            chain_id="A",
+            residue_number=40,
+            pka=4.8,
+        ),
+    )
+
+    comparison = compare_site_sets_pkas(
+        comparison_label="Complex vs Apo",
+        complex_sites=complex_sites,
+        monomer_sites=monomer_sites,
+    )
+
+    assert [shift.chain_id for shift in comparison.shifts] == ["A", "B"]
+    assert [shift.residue_number for shift in comparison.shifts] == [40, 5]
+
+
+def test_compare_site_sets_pkas_does_not_cross_match_different_chains() -> None:
+    complex_sites = (
+        _make_site(
+            label="ASP  12 A",
+            residue_type="ASP",
+            chain_id="A",
+            residue_number=12,
+            pka=4.2,
+        ),
+        _make_site(
+            label="ASP  12 C",
+            residue_type="ASP",
+            chain_id="C",
+            residue_number=12,
+            pka=4.9,
+        ),
+    )
+    monomer_sites = (
+        _make_site(
+            label="ASP  12 A",
+            residue_type="ASP",
+            chain_id="A",
+            residue_number=12,
+            pka=4.6,
+        ),
+    )
+
+    comparison = compare_site_sets_pkas(
+        comparison_label="Complex vs Apo",
+        complex_sites=complex_sites,
+        monomer_sites=monomer_sites,
+    )
+
+    assert len(comparison.shifts) == 1
+    assert comparison.shifts[0].chain_id == "A"
+    assert comparison.unmatched_complex_labels == ("ASP  12 C",)

@@ -26,10 +26,8 @@ from ..viewer import (
 SHIFT_VIEWER_HEIGHT = 620
 SHIFT_TABLE_HEIGHT = 380
 CHAIN_COMPARE_SCHEMA_VERSION = "2026-03-25-chain-compare-v2"
-CHAIN_ROLE_IGNORE = "Ignore"
-CHAIN_ROLE_COMPLEX = "In complex"
-CHAIN_ROLE_MONOMER = "In monomer"
-CHAIN_ROLE_OPTIONS = (CHAIN_ROLE_IGNORE, CHAIN_ROLE_COMPLEX, CHAIN_ROLE_MONOMER)
+ADVANCED_LAST_RUN_KEY = "chain-shift-advanced-last-run"
+ADVANCED_LAST_RESULT_KEY = "chain-shift-advanced-last-result"
 
 
 @st.cache_data(show_spinner=False)
@@ -72,59 +70,130 @@ def render_chain_shift_tab(
 
     if advanced_mode:
         st.caption(
-            "Assign each chain to one side. Chains marked as `Ignore` are excluded "
-            "from both PROPKA calculations."
+            "Select chain sets for the complex and apo states. "
+            "Apo options are restricted to chains selected for complex."
         )
-        chain_roles = _collect_chain_roles(chain_ids)
+        complex_selection = st.pills(
+            "Complex chains",
+            options=list(chain_ids),
+            default=list(chain_ids),
+            selection_mode="multi",
+            format_func=_chain_display_label,
+            key="chain-shift-advanced-complex-pills",
+        ) or []
         complex_chain_ids = tuple(
             chain_id
             for chain_id in chain_ids
-            if chain_roles.get(chain_id) == CHAIN_ROLE_COMPLEX
+            if chain_id in set(complex_selection)
         )
-        monomer_chain_ids = tuple(
+        apo_default = list(complex_chain_ids[:-1]) if len(complex_chain_ids) > 2 else []
+        apo_selection = st.pills(
+            "Apo chains",
+            options=list(complex_chain_ids),
+            default=apo_default,
+            selection_mode="multi",
+            format_func=_chain_display_label,
+            key="chain-shift-advanced-apo-pills",
+        ) or []
+        apo_chain_ids = tuple(
             chain_id
-            for chain_id in chain_ids
-            if chain_roles.get(chain_id) == CHAIN_ROLE_MONOMER
+            for chain_id in complex_chain_ids
+            if chain_id in set(apo_selection)
         )
         st.caption(f"Complex set: `{_chain_set_label(complex_chain_ids)}`")
-        st.caption(f"Monomer set: `{_chain_set_label(monomer_chain_ids)}`")
-        if not complex_chain_ids or not monomer_chain_ids:
+        st.caption(f"Apo set: `{_chain_set_label(apo_chain_ids)}`")
+        if len(complex_chain_ids) <= 1:
+            st.warning("Select at least 2 chains in Complex chains.")
+            return
+        if len(apo_chain_ids) <= 0:
+            st.warning("Select at least 1 chain in Apo chains.")
+            return
+        if len(apo_chain_ids) >= len(complex_chain_ids):
             st.warning(
-                "Select at least one chain in `In complex` and one chain in `In monomer` "
-                "to run the comparison."
+                "Apo chains must be a proper subset of Complex chains."
             )
             return
-        try:
-            with st.spinner("Running PROPKA for selected chain sets..."):
-                complex_analysis = cached_chain_set_analysis(
-                    analysis.pdb_text,
-                    analysis.source_name,
-                    complex_chain_ids,
-                    "complex",
-                    CHAIN_COMPARE_SCHEMA_VERSION,
+
+        run_clicked = st.button(
+            "Run advanced comparison",
+            type="primary",
+            key="chain-shift-advanced-run-button",
+        )
+        if run_clicked:
+            try:
+                with st.spinner("Running PROPKA for selected chain sets..."):
+                    complex_analysis = cached_chain_set_analysis(
+                        analysis.pdb_text,
+                        analysis.source_name,
+                        complex_chain_ids,
+                        "complex",
+                        CHAIN_COMPARE_SCHEMA_VERSION,
+                    )
+                    monomer_analysis = cached_chain_set_analysis(
+                        analysis.pdb_text,
+                        analysis.source_name,
+                        apo_chain_ids,
+                        "apo",
+                        CHAIN_COMPARE_SCHEMA_VERSION,
+                    )
+            except Exception as exc:
+                st.error(
+                    "Chain-set PROPKA failed for the advanced selection. "
+                    "The comparison view could not be assembled."
                 )
-                monomer_analysis = cached_chain_set_analysis(
-                    analysis.pdb_text,
-                    analysis.source_name,
-                    monomer_chain_ids,
-                    "monomer",
-                    CHAIN_COMPARE_SCHEMA_VERSION,
-                )
-        except Exception as exc:
-            st.error(
-                "Chain-set PROPKA failed for the advanced selection. "
-                "The comparison view could not be assembled."
+                st.exception(exc)
+                return
+            comparison = compare_site_sets_pkas(
+                comparison_label="Complex vs Apo",
+                complex_sites=complex_analysis.titration_sites,
+                monomer_sites=monomer_analysis.titration_sites,
             )
-            st.exception(exc)
+            comparison_scope_key = (
+                f"advanced-{_chain_set_key(complex_chain_ids)}-vs-{_chain_set_key(apo_chain_ids)}"
+            )
+            st.session_state[ADVANCED_LAST_RUN_KEY] = {
+                "chain_ids": chain_ids,
+                "complex_chain_ids": complex_chain_ids,
+                "apo_chain_ids": apo_chain_ids,
+            }
+            st.session_state[ADVANCED_LAST_RESULT_KEY] = {
+                "comparison": comparison,
+                "comparison_scope_key": comparison_scope_key,
+            }
+
+        last_run = st.session_state.get(ADVANCED_LAST_RUN_KEY)
+        last_result = st.session_state.get(ADVANCED_LAST_RESULT_KEY)
+        if last_run is None or tuple(last_run.get("chain_ids", ())) != chain_ids:
+            if ADVANCED_LAST_RUN_KEY in st.session_state:
+                del st.session_state[ADVANCED_LAST_RUN_KEY]
+            if ADVANCED_LAST_RESULT_KEY in st.session_state:
+                del st.session_state[ADVANCED_LAST_RESULT_KEY]
+            st.info(
+                "Choose complex/apo chain sets and click `Run advanced comparison` "
+                "to compute pKa deltas."
+            )
             return
-        comparison = compare_site_sets_pkas(
-            comparison_label="Advanced chain selection",
-            complex_sites=complex_analysis.titration_sites,
-            monomer_sites=monomer_analysis.titration_sites,
-        )
-        comparison_scope_key = (
-            f"advanced-{_chain_set_key(complex_chain_ids)}-vs-{_chain_set_key(monomer_chain_ids)}"
-        )
+
+        if last_result is None:
+            st.info(
+                "Choose complex/apo chain sets and click `Run advanced comparison` "
+                "to compute pKa deltas."
+            )
+            return
+
+        run_complex_chain_ids = tuple(last_run["complex_chain_ids"])
+        run_apo_chain_ids = tuple(last_run["apo_chain_ids"])
+        if (
+            run_complex_chain_ids != complex_chain_ids
+            or run_apo_chain_ids != apo_chain_ids
+        ):
+            st.info(
+                "Selections changed. Click Run advanced comparison to update results."
+            )
+            return
+
+        comparison = last_result["comparison"]
+        comparison_scope_key = last_result["comparison_scope_key"]
     else:
         selected_chain = st.selectbox(
             "Select chain",
@@ -272,26 +341,6 @@ def _site_column_label(shift: ChainPkaShift) -> str:
         else f"{shift.residue_number:>5}"
     )
     return f"{shift.chain_id}:{residue_token}-{shift.residue_type}"
-
-
-def _collect_chain_roles(chain_ids: tuple[str, ...]) -> dict[str, str]:
-    roles: dict[str, str] = {}
-    for index, chain_id in enumerate(chain_ids):
-        roles[chain_id] = st.selectbox(
-            f"Chain {_chain_display_label(chain_id)}",
-            options=CHAIN_ROLE_OPTIONS,
-            key=f"chain-shift-advanced-role-{chain_id}",
-            index=_default_chain_role_index(index),
-        )
-    return roles
-
-
-def _default_chain_role_index(chain_index: int) -> int:
-    if chain_index == 0:
-        return CHAIN_ROLE_OPTIONS.index(CHAIN_ROLE_COMPLEX)
-    if chain_index == 1:
-        return CHAIN_ROLE_OPTIONS.index(CHAIN_ROLE_MONOMER)
-    return CHAIN_ROLE_OPTIONS.index(CHAIN_ROLE_IGNORE)
 
 
 def _chain_set_label(chain_ids: tuple[str, ...]) -> str:

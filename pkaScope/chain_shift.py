@@ -109,6 +109,7 @@ def compare_chain_pkas(
         chain_id=normalized_chain_id,
         complex_chain_sites=complex_chain_sites,
         monomer_chain_sites=monomer_chain_sites,
+        allow_cross_chain_match=True,
     )
 
 
@@ -122,6 +123,7 @@ def compare_site_sets_pkas(
         chain_id=comparison_label.strip() or "Custom",
         complex_chain_sites=tuple(complex_sites),
         monomer_chain_sites=tuple(monomer_sites),
+        allow_cross_chain_match=False,
     )
 
 
@@ -130,6 +132,7 @@ def _compare_site_collections(
     chain_id: str,
     complex_chain_sites: tuple[TitrationSite, ...],
     monomer_chain_sites: tuple[TitrationSite, ...],
+    allow_cross_chain_match: bool,
 ) -> ChainPkaComparison:
 
     remaining_monomer_by_site_key = _group_sites_by_site_key(monomer_chain_sites)
@@ -140,7 +143,7 @@ def _compare_site_collections(
 
     for complex_site in sorted(complex_chain_sites, key=_site_sort_key):
         monomer_site = _pop_site(remaining_monomer_by_site_key, complex_site.site_key)
-        if monomer_site is None:
+        if monomer_site is None and allow_cross_chain_match:
             monomer_site = _pop_site(
                 remaining_monomer_by_match_key,
                 _site_match_key(complex_site),
@@ -432,12 +435,22 @@ def _discard_site[T](
             return
 
 
-def _site_sort_key(site: TitrationSite) -> tuple[int, str, str]:
-    return (site.residue_number, site.insertion_code, site.label)
+def _site_sort_key(site: TitrationSite) -> tuple[str, int, str, str]:
+    return (
+        _normalize_chain_id(site.chain_id),
+        site.residue_number,
+        site.insertion_code,
+        site.label,
+    )
 
 
-def _shift_sort_key(shift: ChainPkaShift) -> tuple[int, str, str]:
-    return (shift.residue_number, shift.insertion_code, shift.label)
+def _shift_sort_key(shift: ChainPkaShift) -> tuple[str, int, str, str]:
+    return (
+        _normalize_chain_id(shift.chain_id),
+        shift.residue_number,
+        shift.insertion_code,
+        shift.label,
+    )
 
 
 def _delta_color(delta_pka: float) -> str:
