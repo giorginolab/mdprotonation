@@ -796,7 +796,7 @@ requires-dist = [
     { name = "plotly", specifier = ">=6.6.0" },
     { name = "propka", specifier = ">=3.5.1" },
     { name = "streamlit", specifier = ">=1.55.0" },
-    { name = "streamlit-molstar", directory = "pkaScope/vendor/streamlit-molstar" },
+    { name = "streamlit-molstar", directory = "vendor/streamlit-molstar" },
 ]
 
 [package.metadata.requires-dev]
@@ -1147,7 +1147,7 @@ wheels = [
 [[package]]
 name = "streamlit-molstar"
 version = "0.4.21"
-source = { directory = "pkaScope/vendor/streamlit-molstar" }
+source = { directory = "vendor/streamlit-molstar" }
 dependencies = [
     { name = "mrcfile" },
     { name = "numpy" },

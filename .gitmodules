@@ -1,5 +1,5 @@
-[submodule "mdprotonation/vendor/streamlit-molstar"]
-	path = pkaScope/vendor/streamlit-molstar
+[submodule "vendor/streamlit-molstar"]
+	path = vendor/streamlit-molstar
 	url = https://github.com/giorginolab/streamlit-molstar.git
 [submodule "hf_space"]
 	path = hf_space
