@@ -103,16 +103,8 @@ def render_chain_shift_tab(
         config={"displaylogo": False},
     )
 
-    ranked_shifts = sorted(
-        comparison.shifts,
-        key=lambda shift: (
-            -shift.absolute_delta_pka,
-            shift.residue_number,
-            shift.insertion_code,
-            shift.label,
-        ),
-    )
-    shift_df = _build_shift_dataframe(ranked_shifts)
+    ordered_shifts = list(comparison.shifts)
+    shift_df = _build_shift_dataframe(ordered_shifts)
     styled_shift_df = shift_df.style.format(
         {
             "Complex pKa": "{:.2f}",
@@ -136,10 +128,10 @@ def render_chain_shift_tab(
     )
 
     selected_row = get_table_selection(table_key, table_event.selection).first_row
-    if selected_row is None or selected_row >= len(ranked_shifts):
-        selected_shift = ranked_shifts[0]
+    if selected_row is None or selected_row >= len(ordered_shifts):
+        selected_shift = ordered_shifts[0]
     else:
-        selected_shift = ranked_shifts[selected_row]
+        selected_shift = ordered_shifts[selected_row]
 
     focus_targets = cached_chain_focus_targets(analysis.pdb_text)
     focus_residue = _resolve_focus_target(focus_targets, selected_shift)
@@ -188,7 +180,7 @@ def _build_shift_dataframe(shifts: list[ChainPkaShift]) -> pd.DataFrame:
     return pd.DataFrame(
         [
             {
-                "Site": shift.residue_label,
+                "Site": _site_column_label(shift),
                 "PROPKA label": shift.label,
                 "Complex pKa": shift.complex_pka,
                 "Monomer pKa": shift.monomer_pka,
@@ -198,6 +190,16 @@ def _build_shift_dataframe(shifts: list[ChainPkaShift]) -> pd.DataFrame:
             for shift in shifts
         ]
     )
+
+
+def _site_column_label(shift: ChainPkaShift) -> str:
+    insertion_code = shift.insertion_code.strip()
+    residue_token = (
+        f"{shift.residue_number:>5}{insertion_code}"
+        if insertion_code
+        else f"{shift.residue_number:>5}"
+    )
+    return f"{shift.chain_id}:{residue_token}-{shift.residue_type}"
 
 
 def _resolve_focus_target(
