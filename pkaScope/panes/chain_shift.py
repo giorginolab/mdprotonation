@@ -57,6 +57,11 @@ def render_chain_shift_tab(
     app_state: AppState,
 ) -> None:
     st.subheader("Chain pKa Shifts (Complex vs Monomer)")
+    st.caption(
+        "This type of protonation-state shift analysis is used, for example, in "
+        "Mason AC, Jensen JH. Protein-protein binding is often associated with "
+        "changes in protonation state. [Proteins 2008;71:81-91](https://doi.org/10.1002/prot.21657)."
+    )
     chain_ids = list_chain_ids(analysis.pdb_text)
     if not chain_ids:
         st.info("No chain IDs were found in this structure.")
