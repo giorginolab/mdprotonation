@@ -4,9 +4,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from math import ceil
 
-from matplotlib import pyplot as plt
-from matplotlib.figure import Figure
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from .app_state import site_state_sort_key
 from .charge_colors import charge_color_band, charge_legend_bands
@@ -269,20 +268,27 @@ def _clip_to_plot(value: float, inset: float = 0.0) -> float:
     return value
 
 
-def create_pka_comparison_plot_figure(site_states: list[SiteState], current_ph: float) -> Figure:
+def create_pka_comparison_plot_figure(site_states: list[SiteState], current_ph: float) -> go.Figure:
     sorted_states = sorted(site_states, key=site_state_sort_key)
     if not sorted_states:
-        figure, axis = plt.subplots(figsize=(10.0, 3.0))
-        axis.text(
-            0.5,
-            0.5,
-            "No titratable sites were found.",
-            ha="center",
-            va="center",
-            fontsize=12,
+        figure = go.Figure()
+        figure.add_annotation(
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+            text="No titratable sites were found.",
+            showarrow=False,
+            font={"size": 12, "family": PLOT_FONT_FAMILY, "color": "#111827"},
         )
-        axis.axis("off")
-        figure.tight_layout()
+        figure.update_layout(
+            height=320,
+            margin={"l": 24, "r": 24, "t": 24, "b": 24},
+            xaxis={"visible": False},
+            yaxis={"visible": False},
+            paper_bgcolor="#ffffff",
+            plot_bgcolor="#ffffff",
+        )
         return figure
 
     computed_values = [state.site.pka for state in sorted_states]
@@ -291,80 +297,148 @@ def create_pka_comparison_plot_figure(site_states: list[SiteState], current_ph: 
     labels = [_format_plot_label(state) for state in sorted_states]
     x_positions = list(range(len(sorted_states)))
 
-    figure_width = max(12.5, (len(sorted_states) * 0.4) + 3.5)
-    figure, (pka_axis, delta_axis) = plt.subplots(
+    figure = make_subplots(
         2,
         1,
-        sharex=True,
-        figsize=(figure_width, 8.5),
-        gridspec_kw={"height_ratios": (3.2, 1.5)},
+        shared_xaxes=True,
+        row_heights=[0.68, 0.32],
+        vertical_spacing=0.06,
     )
 
-    pka_axis.plot(
-        x_positions,
-        computed_values,
-        marker="o",
-        markersize=6.0,
-        linewidth=2.5,
-        color="#1d4ed8",
-        label="Computed pKa",
+    figure.add_trace(
+        go.Scatter(
+            x=x_positions,
+            y=computed_values,
+            mode="lines+markers",
+            marker={"symbol": "circle", "size": 8},
+            line={"width": 2.5, "color": "#1d4ed8"},
+            name="Computed pKa",
+            customdata=[[labels[index]] for index in x_positions],
+            hovertemplate="<b>%{customdata[0]}</b><br>Computed pKa: %{y:.2f}<extra></extra>",
+        ),
+        row=1,
+        col=1,
     )
-    pka_axis.plot(
-        x_positions,
-        model_values,
-        marker="s",
-        markersize=6.0,
-        linewidth=2.5,
-        color="#ea580c",
-        label="Model pKa",
+    figure.add_trace(
+        go.Scatter(
+            x=x_positions,
+            y=model_values,
+            mode="lines+markers",
+            marker={"symbol": "square", "size": 8},
+            line={"width": 2.5, "color": "#ea580c"},
+            name="Model pKa",
+            customdata=[[labels[index]] for index in x_positions],
+            hovertemplate="<b>%{customdata[0]}</b><br>Model pKa: %{y:.2f}<extra></extra>",
+        ),
+        row=1,
+        col=1,
     )
-    pka_axis.axhline(
-        current_ph,
-        color="#111827",
-        linewidth=1.8,
-        linestyle="--",
-        alpha=0.85,
-        label=f"Solution pH {current_ph:.1f}",
+    figure.add_hline(
+        y=current_ph,
+        line_color="#111827",
+        line_width=1.8,
+        line_dash="dash",
+        opacity=0.85,
+        row=1,
+        col=1,
+    )
+    figure.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="lines",
+            name=f"Solution pH {current_ph:.1f}",
+            line={"color": "#111827", "width": 1.8, "dash": "dash"},
+            hoverinfo="skip",
+        ),
+        row=1,
+        col=1,
     )
     for x_pos, comp_pka, mod_pka in zip(x_positions, computed_values, model_values):
-        pka_axis.vlines(
-            x_pos,
-            ymin=min(comp_pka, mod_pka),
-            ymax=max(comp_pka, mod_pka),
-            color="#6b7280",
-            linewidth=1.8,
-            alpha=0.55,
-            zorder=1,
+        figure.add_trace(
+            go.Scatter(
+                x=[x_pos, x_pos],
+                y=[min(comp_pka, mod_pka), max(comp_pka, mod_pka)],
+                mode="lines",
+                showlegend=False,
+                line={"color": "#6b7280", "width": 1.8},
+                opacity=0.55,
+                hoverinfo="skip",
+            ),
+            row=1,
+            col=1,
         )
-    pka_axis.set_ylabel("pKa", fontsize=18)
-    pka_axis.grid(axis="y", color="#9ca3af", alpha=0.35, linewidth=0.8)
-    pka_axis.legend(loc="upper left", frameon=False, ncol=3, fontsize=14)
-    pka_axis.spines["top"].set_visible(False)
-    pka_axis.spines["right"].set_visible(False)
-    pka_axis.tick_params(axis="y", labelsize=14)
 
-    delta_axis.bar(
-        x_positions,
-        delta_values,
-        color=[_delta_color(value) for value in delta_values],
-        alpha=0.85,
-        width=0.72,
+    figure.add_trace(
+        go.Bar(
+            x=x_positions,
+            y=delta_values,
+            marker={"color": [_delta_color(value) for value in delta_values]},
+            opacity=0.85,
+            width=0.72,
+            showlegend=False,
+            customdata=[[labels[index]] for index in x_positions],
+            hovertemplate="<b>%{customdata[0]}</b><br>Delta pKa: %{y:+.2f}<extra></extra>",
+        ),
+        row=2,
+        col=1,
     )
-    delta_axis.axhline(0.0, color="#111827", linewidth=1.5, alpha=0.85)
-    delta_axis.grid(axis="y", color="#9ca3af", alpha=0.35, linewidth=0.8)
-    delta_axis.set_ylabel("Delta pKa", fontsize=18)
-    delta_axis.set_xlabel("Residues", fontsize=18)
-    delta_axis.spines["top"].set_visible(False)
-    delta_axis.spines["right"].set_visible(False)
-    delta_axis.tick_params(axis="y", labelsize=14)
+    figure.add_hline(
+        y=0.0,
+        line_color="#111827",
+        line_width=1.5,
+        opacity=0.85,
+        row=2,
+        col=1,
+    )
 
     tick_step = max(1, ceil(len(labels) / 30))
     tick_positions = x_positions[::tick_step]
     tick_labels = labels[::tick_step]
-    delta_axis.set_xticks(tick_positions)
-    delta_axis.set_xticklabels(tick_labels, rotation=70, ha="right", fontsize=12)
+    figure.update_xaxes(
+        tickmode="array",
+        tickvals=tick_positions,
+        ticktext=tick_labels,
+        tickangle=70,
+        title_text="Residues",
+        tickfont={"size": 12},
+        row=2,
+        col=1,
+    )
+    figure.update_yaxes(
+        title_text="pKa",
+        tickfont={"size": 14},
+        showgrid=True,
+        gridcolor="rgba(156, 163, 175, 0.35)",
+        gridwidth=0.8,
+        row=1,
+        col=1,
+    )
+    figure.update_yaxes(
+        title_text="Delta pKa",
+        tickfont={"size": 14},
+        showgrid=True,
+        gridcolor="rgba(156, 163, 175, 0.35)",
+        gridwidth=0.8,
+        row=2,
+        col=1,
+    )
+    figure.update_layout(
+        height=max(560, 220 + (len(sorted_states) * 16)),
+        margin={"l": 36, "r": 24, "t": 44, "b": 24},
+        font={"family": PLOT_FONT_FAMILY, "size": 14, "color": "#111827"},
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "left",
+            "x": 0.0,
+        },
+        hovermode="x unified",
+    )
 
-    figure.tight_layout()
     return figure
 
 

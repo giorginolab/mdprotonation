@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from math import ceil
 from typing import Iterable
 
-from matplotlib import pyplot as plt
-from matplotlib.figure import Figure
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from .pdb_utils import ResidueKey, atom_residue_key, load_pdb_universe, write_pdb_atoms
 from .propka_analysis import TitrationSite
@@ -166,20 +166,27 @@ def top_shift_residue_keys(
 def create_chain_shift_plot_figure(
     shifts: Iterable[ChainPkaShift],
     current_ph: float | None = None,
-) -> Figure:
+) -> go.Figure:
     ordered_shifts = list(shifts)
     if not ordered_shifts:
-        figure, axis = plt.subplots(figsize=(10.0, 3.0))
-        axis.text(
-            0.5,
-            0.5,
-            "No matched titratable sites were available for this chain.",
-            ha="center",
-            va="center",
-            fontsize=12,
+        figure = go.Figure()
+        figure.add_annotation(
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+            text="No matched titratable sites were available for this chain.",
+            showarrow=False,
+            font={"size": 12, "color": "#111827"},
         )
-        axis.axis("off")
-        figure.tight_layout()
+        figure.update_layout(
+            height=320,
+            margin={"l": 24, "r": 24, "t": 24, "b": 24},
+            xaxis={"visible": False},
+            yaxis={"visible": False},
+            paper_bgcolor="#ffffff",
+            plot_bgcolor="#ffffff",
+        )
         return figure
 
     complex_values = [shift.complex_pka for shift in ordered_shifts]
@@ -188,81 +195,149 @@ def create_chain_shift_plot_figure(
     labels = [shift.residue_label for shift in ordered_shifts]
     x_positions = list(range(len(ordered_shifts)))
 
-    figure_width = max(10.0, (len(ordered_shifts) * 0.4) + 3.5)
-    figure, (pka_axis, delta_axis) = plt.subplots(
+    figure = make_subplots(
         2,
         1,
-        sharex=True,
-        figsize=(figure_width, 3.6),
-        gridspec_kw={"height_ratios": (3.2, 1.5)},
+        shared_xaxes=True,
+        row_heights=[0.68, 0.32],
+        vertical_spacing=0.06,
     )
 
-    pka_axis.plot(
-        x_positions,
-        complex_values,
-        marker="o",
-        markersize=4.4,
-        linewidth=1.8,
-        color="#1d4ed8",
-        label="Complex",
+    figure.add_trace(
+        go.Scatter(
+            x=x_positions,
+            y=complex_values,
+            mode="lines+markers",
+            marker={"symbol": "circle", "size": 7},
+            line={"width": 1.8, "color": "#1d4ed8"},
+            name="Complex",
+            customdata=[[labels[index]] for index in x_positions],
+            hovertemplate="<b>%{customdata[0]}</b><br>Complex pKa: %{y:.2f}<extra></extra>",
+        ),
+        row=1,
+        col=1,
     )
-    pka_axis.plot(
-        x_positions,
-        monomer_values,
-        marker="s",
-        markersize=4.4,
-        linewidth=1.8,
-        color="#ea580c",
-        label="Monomer",
+    figure.add_trace(
+        go.Scatter(
+            x=x_positions,
+            y=monomer_values,
+            mode="lines+markers",
+            marker={"symbol": "square", "size": 7},
+            line={"width": 1.8, "color": "#ea580c"},
+            name="Monomer",
+            customdata=[[labels[index]] for index in x_positions],
+            hovertemplate="<b>%{customdata[0]}</b><br>Monomer pKa: %{y:.2f}<extra></extra>",
+        ),
+        row=1,
+        col=1,
     )
     if current_ph is not None:
-        pka_axis.axhline(
-            current_ph,
-            color="#111827",
-            linewidth=1.2,
-            linestyle="--",
-            alpha=0.85,
-            label=f"Solution pH {current_ph:.1f}",
+        figure.add_hline(
+            y=current_ph,
+            line_color="#111827",
+            line_width=1.2,
+            line_dash="dash",
+            opacity=0.85,
+            row=1,
+            col=1,
+        )
+        figure.add_trace(
+            go.Scatter(
+                x=[None],
+                y=[None],
+                mode="lines",
+                name=f"Solution pH {current_ph:.1f}",
+                line={"color": "#111827", "width": 1.2, "dash": "dash"},
+                hoverinfo="skip",
+            ),
+            row=1,
+            col=1,
         )
     for x_position, complex_pka, monomer_pka in zip(
         x_positions, complex_values, monomer_values
     ):
-        pka_axis.vlines(
-            x_position,
-            ymin=min(complex_pka, monomer_pka),
-            ymax=max(complex_pka, monomer_pka),
-            color="#6b7280",
-            linewidth=1.2,
-            alpha=0.55,
-            zorder=1,
+        figure.add_trace(
+            go.Scatter(
+                x=[x_position, x_position],
+                y=[min(complex_pka, monomer_pka), max(complex_pka, monomer_pka)],
+                mode="lines",
+                showlegend=False,
+                line={"color": "#6b7280", "width": 1.2},
+                opacity=0.55,
+                hoverinfo="skip",
+            ),
+            row=1,
+            col=1,
         )
-    pka_axis.set_ylabel("pKa")
-    pka_axis.grid(axis="y", color="#9ca3af", alpha=0.35, linewidth=0.8)
-    pka_axis.legend(loc="upper left", frameon=False)
-    pka_axis.spines["top"].set_visible(False)
-    pka_axis.spines["right"].set_visible(False)
 
-    delta_axis.bar(
-        x_positions,
-        delta_values,
-        color=[_delta_color(value) for value in delta_values],
-        alpha=0.85,
-        width=0.72,
+    figure.add_trace(
+        go.Bar(
+            x=x_positions,
+            y=delta_values,
+            marker={"color": [_delta_color(value) for value in delta_values]},
+            opacity=0.85,
+            width=0.72,
+            showlegend=False,
+            customdata=[[labels[index]] for index in x_positions],
+            hovertemplate="<b>%{customdata[0]}</b><br>Delta pKa: %{y:+.2f}<extra></extra>",
+        ),
+        row=2,
+        col=1,
     )
-    delta_axis.axhline(0.0, color="#111827", linewidth=1.1, alpha=0.85)
-    delta_axis.grid(axis="y", color="#9ca3af", alpha=0.35, linewidth=0.8)
-    delta_axis.set_ylabel("Delta pKa")
-    delta_axis.set_xlabel("Chain residues")
-    delta_axis.spines["top"].set_visible(False)
-    delta_axis.spines["right"].set_visible(False)
+    figure.add_hline(
+        y=0.0,
+        line_color="#111827",
+        line_width=1.1,
+        opacity=0.85,
+        row=2,
+        col=1,
+    )
 
     tick_step = max(1, ceil(len(labels) / 30))
     tick_positions = x_positions[::tick_step]
     tick_labels = labels[::tick_step]
-    delta_axis.set_xticks(tick_positions)
-    delta_axis.set_xticklabels(tick_labels, rotation=70, ha="right", fontsize=8)
+    figure.update_xaxes(
+        tickmode="array",
+        tickvals=tick_positions,
+        ticktext=tick_labels,
+        tickangle=70,
+        title_text="Chain residues",
+        tickfont={"size": 9},
+        row=2,
+        col=1,
+    )
+    figure.update_yaxes(
+        title_text="pKa",
+        showgrid=True,
+        gridcolor="rgba(156, 163, 175, 0.35)",
+        gridwidth=0.8,
+        row=1,
+        col=1,
+    )
+    figure.update_yaxes(
+        title_text="Delta pKa",
+        showgrid=True,
+        gridcolor="rgba(156, 163, 175, 0.35)",
+        gridwidth=0.8,
+        row=2,
+        col=1,
+    )
+    figure.update_layout(
+        height=max(420, 240 + (len(ordered_shifts) * 12)),
+        margin={"l": 32, "r": 24, "t": 36, "b": 24},
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        font={"size": 13, "color": "#111827"},
+        legend={
+            "orientation": "h",
+            "yanchor": "bottom",
+            "y": 1.02,
+            "xanchor": "left",
+            "x": 0.0,
+        },
+        hovermode="x unified",
+    )
 
-    figure.tight_layout()
     return figure
 
 

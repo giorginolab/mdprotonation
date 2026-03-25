@@ -21,5 +21,9 @@ def render_pka_plot_tab(app_state: AppState) -> None:
     st.divider()
     st.subheader("Computed vs Model pKa")
     comparison_figure = create_pka_comparison_plot_figure(site_states, app_state.ph)
-    st.pyplot(comparison_figure, use_container_width=True)
+    st.plotly_chart(
+        comparison_figure,
+        use_container_width=True,
+        config={"displaylogo": False},
+    )
     st.caption("Comparison between computed pKa (blue) and standard model pKa (orange).")

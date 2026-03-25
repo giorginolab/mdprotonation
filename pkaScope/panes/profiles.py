@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import plotly.graph_objects as go
 import streamlit as st
 
 from ..propka_analysis import PropkaAnalysis
@@ -15,7 +16,38 @@ def render_profiles_tab(analysis: PropkaAnalysis) -> None:
         }
         for point in analysis.charge_profile
     ]
-    st.line_chart(charge_points, x="pH", y=["Folded charge", "Unfolded charge"])
+    charge_figure = go.Figure()
+    charge_figure.add_trace(
+        go.Scatter(
+            x=[point["pH"] for point in charge_points],
+            y=[point["Folded charge"] for point in charge_points],
+            mode="lines",
+            name="Folded charge",
+            line={"color": "#1d4ed8", "width": 2.2},
+        )
+    )
+    charge_figure.add_trace(
+        go.Scatter(
+            x=[point["pH"] for point in charge_points],
+            y=[point["Unfolded charge"] for point in charge_points],
+            mode="lines",
+            name="Unfolded charge",
+            line={"color": "#ea580c", "width": 2.2},
+        )
+    )
+    charge_figure.update_layout(
+        margin={"l": 24, "r": 24, "t": 24, "b": 24},
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        hovermode="x unified",
+    )
+    charge_figure.update_xaxes(title_text="pH")
+    charge_figure.update_yaxes(title_text="Charge")
+    st.plotly_chart(
+        charge_figure,
+        use_container_width=True,
+        config={"displaylogo": False},
+    )
 
     st.subheader("Free Energy of Folding")
     if not analysis.folding_profile:
@@ -40,8 +72,27 @@ def render_profiles_tab(analysis: PropkaAnalysis) -> None:
         }
         for point in analysis.folding_profile
     ]
-    st.line_chart(
-        folding_points,
-        x="pH",
-        y=["Free energy of folding (kcal/mol)"],
+    folding_figure = go.Figure()
+    folding_figure.add_trace(
+        go.Scatter(
+            x=[point["pH"] for point in folding_points],
+            y=[point["Free energy of folding (kcal/mol)"] for point in folding_points],
+            mode="lines",
+            name="Free energy of folding (kcal/mol)",
+            line={"color": "#7c3aed", "width": 2.2},
+        )
+    )
+    folding_figure.update_layout(
+        margin={"l": 24, "r": 24, "t": 24, "b": 24},
+        paper_bgcolor="#ffffff",
+        plot_bgcolor="#ffffff",
+        hovermode="x unified",
+        showlegend=False,
+    )
+    folding_figure.update_xaxes(title_text="pH")
+    folding_figure.update_yaxes(title_text="Free energy of folding (kcal/mol)")
+    st.plotly_chart(
+        folding_figure,
+        use_container_width=True,
+        config={"displaylogo": False},
     )

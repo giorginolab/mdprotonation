@@ -128,7 +128,9 @@ def test_create_pka_comparison_plot_figure_runs_without_error() -> None:
 
     figure = create_pka_comparison_plot_figure(states, current_ph=7.4)
     assert figure is not None
-    assert len(figure.axes) == 2
+    assert len(figure.data) >= 3
+    assert figure.layout.yaxis.title.text == "pKa"
+    assert figure.layout.yaxis2.title.text == "Delta pKa"
 
 
 def test_create_pka_plot_figure_returns_plotly_figure() -> None:
