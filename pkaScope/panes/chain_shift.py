@@ -240,7 +240,7 @@ def render_chain_shift_tab(
 
     st.plotly_chart(
         create_chain_shift_plot_figure(comparison.shifts, current_ph=app_state.ph),
-        use_container_width=True,
+        width="stretch",
         config={"displaylogo": False},
     )
 
@@ -261,7 +261,7 @@ def render_chain_shift_tab(
     table_event = st.dataframe(
         styled_shift_df,
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         height=SHIFT_TABLE_HEIGHT,
         key=table_key,
         selection_mode="single-row",

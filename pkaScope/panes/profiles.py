@@ -45,7 +45,7 @@ def render_profiles_tab(analysis: PropkaAnalysis) -> None:
     charge_figure.update_yaxes(title_text="Charge")
     st.plotly_chart(
         charge_figure,
-        use_container_width=True,
+        width="stretch",
         config={"displaylogo": False},
     )
 
@@ -93,6 +93,6 @@ def render_profiles_tab(analysis: PropkaAnalysis) -> None:
     folding_figure.update_yaxes(title_text="Free energy of folding (kcal/mol)")
     st.plotly_chart(
         folding_figure,
-        use_container_width=True,
+        width="stretch",
         config={"displaylogo": False},
     )

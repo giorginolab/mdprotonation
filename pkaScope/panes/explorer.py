@@ -95,7 +95,7 @@ def render_explorer_tab(
         st.subheader("Residue Protonation States")
         table_event = st.dataframe(
             styled_state_df,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             height=_site_table_height(len(state_df)),
             column_order=SITE_TABLE_VISIBLE_COLUMNS,
@@ -136,7 +136,7 @@ def render_explorer_tab(
         for interaction in selected_state.site.interactions
     ]
     if interaction_rows:
-        st.dataframe(interaction_rows, use_container_width=True, hide_index=True)
+        st.dataframe(interaction_rows, width="stretch", hide_index=True)
     else:
         st.info("PROPKA reported no non-self interaction residues for this site.")
 

@@ -33,7 +33,7 @@ def render_sidebar_summary(app_state: AppState) -> SiteState | None:
         )
         table_event = st.dataframe(
             responsive_df,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             key="responsive-site-table",
             on_select=partial(set_active_selection_source, "responsive"),

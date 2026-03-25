@@ -13,7 +13,7 @@ def render_pka_plot_tab(app_state: AppState) -> None:
     pka_plot_figure = create_pka_plot_figure(site_states, app_state.ph)
     st.plotly_chart(
         pka_plot_figure,
-        use_container_width=True,
+        width="stretch",
         config={"displaylogo": False},
     )
     st.caption(PKA_PLOT_CAPTION)
@@ -23,7 +23,7 @@ def render_pka_plot_tab(app_state: AppState) -> None:
     comparison_figure = create_pka_comparison_plot_figure(site_states, app_state.ph)
     st.plotly_chart(
         comparison_figure,
-        use_container_width=True,
+        width="stretch",
         config={"displaylogo": False},
     )
     st.caption("Comparison between computed pKa (blue) and standard model pKa (orange).")
