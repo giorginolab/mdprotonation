@@ -9,6 +9,7 @@ from pkaScope.online_pdb import OnlinePdbError, fetch_pdb_from_rcsb, normalize_p
 from pkaScope.panes import (
     render_chain_shift_tab,
     render_explorer_tab,
+    render_hbond_optimization_tab,
     render_pka_plot_tab,
     render_profiles_tab,
     render_propka_data_tab,
@@ -152,8 +153,22 @@ def main() -> None:
     app_state = build_app_state(analysis, ph)
     responsive_selected_state = render_sidebar_summary(app_state)
 
-    overview_tab, pka_plot_tab, profiles_tab, chain_shift_tab, propka_tab = st.tabs(
-        ["Explorer", "pKa Plot", "Profiles", "Chain Shifts", "PROPKA Data"]
+    (
+        overview_tab,
+        pka_plot_tab,
+        profiles_tab,
+        hbond_opt_tab,
+        chain_shift_tab,
+        propka_tab,
+    ) = st.tabs(
+        [
+            "Explorer",
+            "pKa Plot",
+            "Profiles",
+            "H-Bond Optimize",
+            "Chain Shifts",
+            "PROPKA Data",
+        ]
     )
 
     with overview_tab:
@@ -168,6 +183,9 @@ def main() -> None:
 
     with profiles_tab:
         render_profiles_tab(analysis)
+
+    with hbond_opt_tab:
+        render_hbond_optimization_tab(analysis, ph)
 
     with chain_shift_tab:
         render_chain_shift_tab(analysis, app_state)

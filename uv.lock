@@ -197,6 +197,15 @@ wheels = [
 ]
 
 [[package]]
+name = "docutils"
+version = "0.17.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4c/17/559b4d020f4b46e0287a2eddf2d8ebf76318fd3bd495f1625414b052fdc9/docutils-0.17.1.tar.gz", hash = "sha256:686577d2e4c32380bb50cbb22f575ed742d58168cee37e99117a854bcd88f125", size = 2016138, upload-time = "2021-04-17T14:13:28.434Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4c/5e/6003a0d1f37725ec2ebd4046b657abb9372202655f96e76795dca8c0063c/docutils-0.17.1-py2.py3-none-any.whl", hash = "sha256:cf316c8370a737a022b72b56874f6602acf974a37a9fba42ec2876387549fc61", size = 575533, upload-time = "2021-04-17T14:13:24.796Z" },
+]
+
+[[package]]
 name = "filelock"
 version = "3.25.2"
 source = { registry = "https://pypi.org/simple" }
@@ -547,6 +556,15 @@ wheels = [
 ]
 
 [[package]]
+name = "mmcif-pdbx"
+version = "2.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/47/f8/3751c762e70eec6697455beb8400b2a1adcb5771d0843e9460f141cdf7e3/mmcif-pdbx-2.0.1.tar.gz", hash = "sha256:a1f20cf35f92916160ae066f510cce9a0c21a630d064dafce545ba0cf47c9280", size = 18938, upload-time = "2021-04-24T21:30:14.259Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/03/8e/ff50191d2210faac7df6b2e66cf39e021bd7051bd9389b341b1d560cae49/mmcif_pdbx-2.0.1-py2.py3-none-any.whl", hash = "sha256:506ae136a837dd345ea6a0c993646a7297f8b883f3ec21c055941cc7728d1990", size = 20180, upload-time = "2021-04-24T21:30:12.821Z" },
+]
+
+[[package]]
 name = "mmtf-python"
 version = "1.1.3"
 source = { registry = "https://pypi.org/simple" }
@@ -714,6 +732,22 @@ wheels = [
 ]
 
 [[package]]
+name = "pdb2pqr"
+version = "3.7.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "docutils" },
+    { name = "mmcif-pdbx" },
+    { name = "numpy" },
+    { name = "propka" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a5/f2/f63603a19b30518d20f7900a5d7597f6dc9447d09b501e864191b370fa38/pdb2pqr-3.7.1.tar.gz", hash = "sha256:05b5c464022a3ad11c9597c6fc7f70c56061c4669b1497a51958da90d959152f", size = 13436854, upload-time = "2024-12-28T03:43:19.74Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/fb/6c702588f9c6de3ca17adb35952dfdd662856f913e4844032a7a01e2a7db/pdb2pqr-3.7.1-py3-none-any.whl", hash = "sha256:15f7422a41ea4c789e564e2ef00ac10b8f020b589b650f6225e627a5901305ea", size = 207930, upload-time = "2024-12-28T03:43:17.284Z" },
+]
+
+[[package]]
 name = "pillow"
 version = "12.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -778,6 +812,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "matplotlib" },
     { name = "mdanalysis" },
+    { name = "pdb2pqr" },
     { name = "plotly" },
     { name = "propka" },
     { name = "streamlit" },
@@ -793,6 +828,7 @@ dev = [
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "mdanalysis", specifier = ">=2.10.0" },
+    { name = "pdb2pqr", specifier = ">=3.7.1" },
     { name = "plotly", specifier = ">=6.6.0" },
     { name = "propka", specifier = ">=3.5.1" },
     { name = "streamlit", specifier = ">=1.55.0" },
