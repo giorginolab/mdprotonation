@@ -26,6 +26,10 @@ HBOND_SELECTED_RESIDUE_KEY = "hbond-diagnostics-selected-residue"
 _EXPLICIT_RESIDUE_PATTERNS = (
     re.compile(r"\bin residue\s+([A-Z0-9]{2,3})\s+([A-Za-z0-9])\s+(-?\d+)([A-Za-z]?)\b"),
     re.compile(r"\bUnable to debump\s+([A-Z0-9]{2,3})\s+([A-Za-z0-9])\s+(-?\d+)([A-Za-z]?)\b"),
+    re.compile(
+        r"\bfor\s+([A-Z0-9]{2,3})\s+(-?\d+)([A-Za-z]?)\s+([A-Za-z0-9])(?:\s+\([^)]+\))?\b",
+        re.IGNORECASE,
+    ),
 )
 _RESNUM_CHAIN_PATTERN = re.compile(
     r"^\s*([A-Z0-9]{2,3})\s+(-?\d+)([A-Za-z]?)\s+([A-Za-z0-9])\s*$"
@@ -35,6 +39,10 @@ _GENERAL_RESIDUE_PATTERN = re.compile(
 )
 _UNKNOWN_RESIDUE_HEADER_PATTERN = re.compile(
     r"could not identify the following residues and residue numbers",
+    re.IGNORECASE,
+)
+_UNKNOWN_DEFINITION_PATTERN = re.compile(
+    r"Unable to find amino or nucleic acid definition for\s+([A-Z0-9]{2,3})\.",
     re.IGNORECASE,
 )
 
@@ -317,6 +325,20 @@ def extract_diagnostic_residue_mentions(
         if _UNKNOWN_RESIDUE_HEADER_PATTERN.search(line_text):
             in_unknown_residue_block = True
             continue
+        unknown_definition_match = _UNKNOWN_DEFINITION_PATTERN.search(line_text)
+        if unknown_definition_match:
+            mentions.append(
+                DiagnosticResidueMention(
+                    line_index=line_index,
+                    line_text=line_text,
+                    category="Unknown residue",
+                    residue_type=unknown_definition_match.group(1).upper(),
+                    chain_id="?",
+                    residue_number=0,
+                    insertion_code="",
+                )
+            )
+            continue
         category = categorize_diagnostic_line(line_text)
         if in_unknown_residue_block and category == "Other":
             category = "Unknown residue"
@@ -335,6 +357,13 @@ def extract_diagnostic_residue_mentions(
                 seen.add(match_key)
                 residue_type = match.group(1).strip().upper()
                 if pattern is _RESNUM_CHAIN_PATTERN:
+                    try:
+                        residue_number = int(match.group(2))
+                    except ValueError:
+                        continue
+                    insertion_code = match.group(3).strip().upper()
+                    chain_id = match.group(4).strip() or "?"
+                elif "for\\s+" in pattern.pattern:
                     try:
                         residue_number = int(match.group(2))
                     except ValueError:
@@ -367,7 +396,11 @@ def extract_diagnostic_residue_mentions(
 
 def categorize_diagnostic_line(line_text: str) -> str:
     lowered = line_text.lower()
+    if "failed protonation" in lowered:
+        return "Failed protonation"
     if "missing atom" in lowered:
+        return "Missing atom"
+    if "missing atoms" in lowered:
         return "Missing atom"
     if "unable to debump" in lowered:
         return "Debump"

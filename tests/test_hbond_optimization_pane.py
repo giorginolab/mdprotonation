@@ -68,6 +68,28 @@ def test_extract_diagnostic_residue_mentions_parses_resnum_chain_block() -> None
     assert mentions[0].category == "Unknown residue"
 
 
+def test_extract_diagnostic_residue_mentions_parses_unknown_definition_line() -> None:
+    diagnostics = (
+        "Unable to find amino or nucleic acid definition for NAG.  Parsing as new residue.",
+    )
+    mentions = extract_diagnostic_residue_mentions(diagnostics)
+    assert len(mentions) == 1
+    assert mentions[0].residue_type == "NAG"
+    assert mentions[0].residue_key == ("?", 0, "")
+    assert mentions[0].category == "Unknown residue"
+
+
+def test_extract_diagnostic_residue_mentions_parses_failed_protonation_line() -> None:
+    diagnostics = (
+        "Missing atoms or failed protonation for ASN 139 A (AMD) -- please check the structure",
+    )
+    mentions = extract_diagnostic_residue_mentions(diagnostics)
+    assert len(mentions) == 1
+    assert mentions[0].residue_key == ("A", 139, "")
+    assert mentions[0].residue_type == "ASN"
+    assert mentions[0].category == "Failed protonation"
+
+
 def test_categorize_diagnostic_line_maps_expected_categories() -> None:
     assert categorize_diagnostic_line("Missing atom NH2 in residue ARG D 94") == "Missing atom"
     assert categorize_diagnostic_line("WARNING: Unable to debump ARG A 308") == "Debump"
@@ -82,6 +104,12 @@ def test_categorize_diagnostic_line_maps_expected_categories() -> None:
             "Unable to find amino or nucleic acid definition for ZN.  Parsing as new residue."
         )
         == "Unknown residue"
+    )
+    assert (
+        categorize_diagnostic_line(
+            "Missing atoms or failed protonation for ASN 139 A (AMD) -- please check the structure"
+        )
+        == "Failed protonation"
     )
 
 

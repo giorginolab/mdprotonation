@@ -195,7 +195,7 @@ def main() -> None:
 
     st.divider()
     st.markdown(
-        "Created by [Toni Giorgino](https://www.giorginolab.it) | AI coded | "
+        "AI-assisted coding by [Toni Giorgino](https://www.giorginolab.it) | "
         "[GitHub](https://github.com/giorginolab/pkaScope#) | "
         "[Hugging Face Space](https://huggingface.co/spaces/tonigi/pkaScope)"
     )
