@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      #viewer {
+        width: 100%;
+        height: 500px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="viewer"></div>
+    <script>
+      const Streamlit = (() => {
+        const RENDER_EVENT = "streamlit:render";
+
+        function sendMessage(type, payload = {}) {
+          window.parent.postMessage(
+            { isStreamlitMessage: true, type, ...payload },
+            "*"
+          );
+        }
+
+        return {
+          RENDER_EVENT,
+          events: {
+            addEventListener(type, callback) {
+              window.addEventListener("message", (event) => {
+                const data = event && event.data ? event.data : {};
+                if (data.type === type) {
+                  callback({ detail: data });
+                }
+              });
+            }
+          },
+          setComponentReady() {
+            sendMessage("streamlit:componentReady", { apiVersion: 1 });
+          },
+          setFrameHeight(height) {
+            sendMessage("streamlit:setFrameHeight", { height });
+          },
+          setComponentValue(value) {
+            sendMessage("streamlit:setComponentValue", { value });
+          }
+        };
+      })();
+
+      let molstarLoadPromise = null;
+      let viewerPromise = null;
+      let viewerInstance = null;
+      let loadedModelKey = null;
+      let appliedFocusToken = null;
+
+      function ensureMolstarLoaded() {
+        if (window.molstar) return Promise.resolve();
+        if (molstarLoadPromise) return molstarLoadPromise;
+
+        molstarLoadPromise = new Promise((resolve, reject) => {
+          if (!document.querySelector("link[data-molstar-css='1']")) {
+            const css = document.createElement("link");
+            css.rel = "stylesheet";
+            css.type = "text/css";
+            css.href = "https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.css";
+            css.setAttribute("data-molstar-css", "1");
+            document.head.appendChild(css);
+          }
+
+          const script = document.createElement("script");
+          script.src = "https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.js";
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error("Failed to load Molstar bundle"));
+          document.head.appendChild(script);
+        });
+
+        return molstarLoadPromise;
+      }
+
+      function getHeight(args) {
+        const height = Number(args?.height ?? 500);
+        return Number.isFinite(height) && height > 0 ? height : 500;
+      }
+
+      function setViewerHeight(height) {
+        const viewer = document.getElementById("viewer");
+        if (viewer) viewer.style.height = `${height}px`;
+        Streamlit.setFrameHeight(height);
+      }
+
+      async function ensureViewer(args) {
+        if (viewerInstance) return viewerInstance;
+        if (viewerPromise) return viewerPromise;
+
+        setViewerHeight(getHeight(args));
+
+        viewerPromise = (async () => {
+          await ensureMolstarLoaded();
+          viewerInstance = await window.molstar.Viewer.create("viewer", {
+            layoutIsExpanded: false,
+            layoutShowControls: false,
+            viewportShowToggleFullscreen: true,
+            viewportShowExpand: false
+          });
+          return viewerInstance;
+        })();
+
+        return viewerPromise;
+      }
+
+      function residueExpression(queryBuilder, residue) {
+        const tests = [
+          queryBuilder.core.rel.eq([queryBuilder.ammp("auth_seq_id"), residue.residueNumber])
+        ];
+        if (residue.chainId && residue.chainId !== "?") {
+          tests.push(
+            queryBuilder.core.rel.eq([queryBuilder.ammp("auth_asym_id"), residue.chainId])
+          );
+        }
+        if (residue.insertionCode) {
+          tests.push(
+            queryBuilder.core.rel.eq([
+              queryBuilder.ammp("pdbx_PDB_ins_code"),
+              residue.insertionCode
+            ])
+          );
+        }
+        return queryBuilder.struct.generator.atomGroups({
+          "residue-test": queryBuilder.core.logic.and(tests)
+        });
+      }
+
+      function applyResidueSelection(viewer, residue) {
+        try {
+          viewer.structureInteractivity({ action: "select" });
+          if (!residue) return;
+          viewer.structureInteractivity({
+            expression: (queryBuilder) => residueExpression(queryBuilder, residue),
+            action: "select"
+          });
+        } catch (_err) {
+          // Selection update is best effort.
+        }
+      }
+
+      function applyStructureFocus(viewer) {
+        try {
+          const hierarchy = viewer.plugin.managers.structure.hierarchy.current;
+          const structures = hierarchy && Array.isArray(hierarchy.structures)
+            ? hierarchy.structures
+            : [];
+          const selection = viewer.plugin.managers.structure.selection;
+          const focusManager = viewer.plugin.managers.structure.focus;
+          for (const entry of structures) {
+            const structure = entry?.cell?.obj?.data;
+            if (!structure) continue;
+            const loci = selection.getLoci(structure);
+            if (loci && Array.isArray(loci.elements) && loci.elements.length > 0) {
+              focusManager.setFromLoci(loci);
+              return true;
+            }
+          }
+          focusManager.clear();
+        } catch (_err) {
+          // Focus representation is best effort.
+        }
+        return false;
+      }
+
+      async function onRender(event) {
+        const args = event?.detail?.args ?? {};
+        let viewer = null;
+        try {
+          viewer = await ensureViewer(args);
+        } catch (_err) {
+          // Keep component responsive even if viewer init fails.
+          Streamlit.setFrameHeight(getHeight(args));
+          return;
+        }
+        setViewerHeight(getHeight(args));
+
+        const modelKey = String(args.modelKey ?? "");
+        if (modelKey && modelKey !== loadedModelKey) {
+          await viewer.loadMvsData(args.mvsData, args.mvsFormat ?? "mvsx");
+          loadedModelKey = modelKey;
+          appliedFocusToken = null;
+          applyResidueSelection(viewer, null);
+        }
+
+        const focusResidue = args.focusResidue ?? null;
+        if (focusResidue && Array.isArray(focusResidue.center) && focusResidue.center.length >= 3) {
+          const token = String(
+            focusResidue.token ??
+              `${focusResidue.chainId}:${focusResidue.residueNumber}:${focusResidue.insertionCode ?? ""}:${modelKey}`
+          );
+          if (token !== appliedFocusToken) {
+            applyResidueSelection(viewer, focusResidue);
+            applyStructureFocus(viewer);
+            const radius = Math.max(Number(focusResidue.radius) || 0, 2.5);
+            const durationMs = Number(args.focusDurationMs ?? 420);
+            try {
+              viewer.plugin.managers.camera.focusSphere(
+                { center: focusResidue.center, radius },
+                { durationMs: Number.isFinite(durationMs) ? durationMs : 420 }
+              );
+            } catch (_err) {
+              // Focus update is best effort.
+            }
+            appliedFocusToken = token;
+          }
+        } else if (!focusResidue) {
+          applyResidueSelection(viewer, null);
+          try {
+            viewer.plugin.managers.structure.focus.clear();
+          } catch (_err) {
+            // Best effort focus clear.
+          }
+          appliedFocusToken = null;
+        }
+
+        Streamlit.setFrameHeight(getHeight(args));
+      }
+
+      Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
+      Streamlit.setComponentReady();
+      Streamlit.setFrameHeight(500);
+    </script>
+  </body>
+</html>

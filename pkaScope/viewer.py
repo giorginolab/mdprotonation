@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 from dataclasses import dataclass
-import json
 from math import sqrt
-from typing import Any
 
 import molviewspec as mvs
-import streamlit.components.v1 as components
 
 from .pdb_utils import ResidueKey, parse_pdb_atoms
+from .streamlit_molstar_focus_component import st_molstar_focus_component
 
 
 @dataclass(frozen=True)
@@ -73,20 +72,29 @@ def st_molstar_focusable_content(
     height: str = "240px",
     key: str | None = None,
 ):
-    del traj_file_content, traj_file_format, traj_file_name, key
+    del traj_file_content, traj_file_format, traj_file_name
     model_file_name = file_name or f"unknown.{file_format}"
     parser_format = file_format.lower()
     state = _build_scene_state(
         model_file_name=model_file_name,
         parser_format=parser_format,
-        focus_residue=focus_residue,
     )
     assets = {model_file_name: file_content.encode("utf-8")}
-    return _render_streamlit_molstar(
-        state=state,
-        assets=assets,
-        height_px=_parse_height_px(height),
-        focus_residue=focus_residue,
+    mvsx_bytes = mvs.MVSX(data=state, assets=assets).dumps()
+    mvs_data = "base64," + base64.b64encode(mvsx_bytes).decode("ascii")
+    model_key = _model_key(
+        parser_format=parser_format,
+        model_file_name=model_file_name,
+        file_content=file_content,
+    )
+    return st_molstar_focus_component(
+        mvs_data=mvs_data,
+        model_key=model_key,
+        focus_residue=(
+            focus_residue.to_component_dict() if focus_residue is not None else None
+        ),
+        height=_parse_height_px(height),
+        key=key,
     )
 
 
@@ -94,7 +102,6 @@ def _build_scene_state(
     *,
     model_file_name: str,
     parser_format: str,
-    focus_residue: ResidueFocusTarget | None,
 ) -> mvs.State:
     builder = mvs.create_builder()
     structure = (
@@ -107,84 +114,12 @@ def _build_scene_state(
         custom={"molstar_use_default_coloring": True}
     )
     structure.component(selector="ligand").representation().color(color="blue")
-    if focus_residue is not None:
-        selector: dict[str, Any] = {
-            "auth_seq_id": focus_residue.residue_number,
-        }
-        if focus_residue.chain_id != "?":
-            selector["auth_asym_id"] = focus_residue.chain_id
-        if focus_residue.insertion_code:
-            selector["pdbx_PDB_ins_code"] = focus_residue.insertion_code
-        structure.component(selector=selector).focus(
-            radius=max(2.5, focus_residue.radius)
-        )
-        structure.component(selector=selector).representation(
-            type="ball_and_stick",
-            size_factor=1.05,
-            ignore_hydrogens=True,
-        ).color(color="#ff8c00")
     return builder.get_state()
 
 
-def _render_streamlit_molstar(
-    *,
-    state: mvs.State,
-    assets: dict[str, bytes],
-    height_px: int | None,
-    focus_residue: ResidueFocusTarget | None,
-):
-    if focus_residue is None:
-        return state.molstar_streamlit(data=assets, height=height_px)
-
-    # Use MolViewSpec for state serialization, then apply camera focus
-    # imperatively once the viewer is ready.
-    mvsx_bytes = mvs.MVSX(data=state, assets=assets).dumps()
-    mvs_data = "base64," + base64.b64encode(mvsx_bytes).decode("ascii")
-    focus_payload = {
-        "center": [float(v) for v in focus_residue.center],
-        "radius": float(max(2.5, focus_residue.radius)),
-    }
-    html = f"""<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <style>
-      #viewer1 {{
-        opacity: 0;
-      }}
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.js"></script>
-    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.css" />
-  </head>
-  <body>
-    <div id="viewer1"></div>
-    <script>
-      const mvsData = {json.dumps(mvs_data)};
-      const focus = {json.dumps(focus_payload)};
-      molstar.Viewer.create("viewer1", {{
-        layoutIsExpanded: false,
-        layoutShowControls: false,
-        viewportShowToggleFullscreen: true,
-        viewportShowExpand: false
-      }}).then(async (viewer) => {{
-        await viewer.loadMvsData(mvsData, "mvsx");
-        window.setTimeout(() => {{
-          try {{
-            viewer.plugin.managers.camera.focusSphere(
-              {{ center: focus.center, radius: focus.radius }},
-              {{ durationMs: 0 }}
-            );
-          }} catch (_err) {{
-            // Best effort focus call.
-          }}
-          const container = document.getElementById("viewer1");
-          if (container) container.style.opacity = "1";
-        }}, 60);
-      }});
-    </script>
-  </body>
-</html>
-"""
-    return components.html(html, height=height_px)
+def _model_key(*, parser_format: str, model_file_name: str, file_content: str) -> str:
+    digest = hashlib.sha1(file_content.encode("utf-8"), usedforsecurity=False).hexdigest()
+    return f"{parser_format}:{model_file_name}:{digest}"
 
 
 def _parse_height_px(height: str | int | None) -> int | None:
