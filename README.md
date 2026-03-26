@@ -25,13 +25,11 @@ Live demo: [Hugging Face Space](https://huggingface.co/spaces/tonigi/pkaScope)
 This repository uses `uv` for Python workflows.
 
 ```bash
-git clone --recurse-submodules git@github.com:giorginolab/pkaScope.git
+git clone git@github.com:giorginolab/pkaScope.git
 cd pkaScope
 uv sync
 uv run streamlit run main.py
 ```
-
-If you already cloned the repository without submodules, run `git submodule update --init --recursive` once before `uv sync`.
 
 Then open the local Streamlit URL shown in the terminal.
 
@@ -50,10 +48,10 @@ After completion, the pane shows:
 
 ## How the First Viewer Version Works
 
-The current viewer uses a modified `streamlit-molstar` to render the
-structure. That component does not yet expose a convenient Python-side
-API for per-residue coloring or selection, so the app currently rewrites
-the loaded PDB before display:
+The current viewer uses `molviewspec` with the Streamlit interface shown
+in `vendor/mol-view-spec/test-data/streamlit`. The app rewrites the
+loaded PDB before display so per-residue protonation state is encoded in
+the structure:
 
 - occupancy stores the average protonated fraction for each titratable residue
 - B-factor stores transition intensity scaled to `0-100`

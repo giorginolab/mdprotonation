@@ -1,18 +1,15 @@
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass
+import json
 from math import sqrt
-from pathlib import Path
+from typing import Any
 
+import molviewspec as mvs
 import streamlit.components.v1 as components
-import streamlit_molstar
 
 from .pdb_utils import ResidueKey, parse_pdb_atoms
-
-_COMPONENT_FUNC = components.declare_component(
-    "pkaScope_molstar",
-    path=str(Path(streamlit_molstar.__file__).resolve().parent / "frontend" / "build"),
-)
 
 
 @dataclass(frozen=True)
@@ -76,28 +73,132 @@ def st_molstar_focusable_content(
     height: str = "240px",
     key: str | None = None,
 ):
-    params = {
-        "scene": "basic",
-        "height": height,
-        "modelFile": {
-            "name": file_name or f"unknown.{file_format}",
-            "data": "<placeholder>",
-            "format": file_format,
-        },
-        "modelFile_data": file_content,
-        "focusResidue": (
-            focus_residue.to_component_dict() if focus_residue is not None else None
-        ),
-    }
-    if traj_file_content is not None and traj_file_format is not None:
-        params["trajFile"] = {
-            "name": traj_file_name or f"unknown.{traj_file_format}",
-            "data": "<placeholder>",
-            "format": traj_file_format,
-        }
-        params["trajFile_data"] = traj_file_content
+    del traj_file_content, traj_file_format, traj_file_name, key
+    model_file_name = file_name or f"unknown.{file_format}"
+    parser_format = file_format.lower()
+    state = _build_scene_state(
+        model_file_name=model_file_name,
+        parser_format=parser_format,
+        focus_residue=focus_residue,
+    )
+    assets = {model_file_name: file_content.encode("utf-8")}
+    return _render_streamlit_molstar(
+        state=state,
+        assets=assets,
+        height_px=_parse_height_px(height),
+        focus_residue=focus_residue,
+    )
 
-    return _COMPONENT_FUNC(key=key, default=None, **params)
+
+def _build_scene_state(
+    *,
+    model_file_name: str,
+    parser_format: str,
+    focus_residue: ResidueFocusTarget | None,
+) -> mvs.State:
+    builder = mvs.create_builder()
+    structure = (
+        builder
+        .download(url=model_file_name)
+        .parse(format=parser_format)
+        .model_structure()
+    )
+    structure.component(selector="polymer").representation().color(
+        custom={"molstar_use_default_coloring": True}
+    )
+    structure.component(selector="ligand").representation().color(color="blue")
+    if focus_residue is not None:
+        selector: dict[str, Any] = {
+            "auth_seq_id": focus_residue.residue_number,
+        }
+        if focus_residue.chain_id != "?":
+            selector["auth_asym_id"] = focus_residue.chain_id
+        if focus_residue.insertion_code:
+            selector["pdbx_PDB_ins_code"] = focus_residue.insertion_code
+        structure.component(selector=selector).focus(
+            radius=max(2.5, focus_residue.radius)
+        )
+        structure.component(selector=selector).representation(
+            type="ball_and_stick",
+            size_factor=1.05,
+            ignore_hydrogens=True,
+        ).color(color="#ff8c00")
+    return builder.get_state()
+
+
+def _render_streamlit_molstar(
+    *,
+    state: mvs.State,
+    assets: dict[str, bytes],
+    height_px: int | None,
+    focus_residue: ResidueFocusTarget | None,
+):
+    if focus_residue is None:
+        return state.molstar_streamlit(data=assets, height=height_px)
+
+    # Use MolViewSpec for state serialization, then apply camera focus
+    # imperatively once the viewer is ready.
+    mvsx_bytes = mvs.MVSX(data=state, assets=assets).dumps()
+    mvs_data = "base64," + base64.b64encode(mvsx_bytes).decode("ascii")
+    focus_payload = {
+        "center": [float(v) for v in focus_residue.center],
+        "radius": float(max(2.5, focus_residue.radius)),
+    }
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <style>
+      #viewer1 {{
+        opacity: 0;
+      }}
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.css" />
+  </head>
+  <body>
+    <div id="viewer1"></div>
+    <script>
+      const mvsData = {json.dumps(mvs_data)};
+      const focus = {json.dumps(focus_payload)};
+      molstar.Viewer.create("viewer1", {{
+        layoutIsExpanded: false,
+        layoutShowControls: false,
+        viewportShowToggleFullscreen: true,
+        viewportShowExpand: false
+      }}).then(async (viewer) => {{
+        await viewer.loadMvsData(mvsData, "mvsx");
+        window.setTimeout(() => {{
+          try {{
+            viewer.plugin.managers.camera.focusSphere(
+              {{ center: focus.center, radius: focus.radius }},
+              {{ durationMs: 0 }}
+            );
+          }} catch (_err) {{
+            // Best effort focus call.
+          }}
+          const container = document.getElementById("viewer1");
+          if (container) container.style.opacity = "1";
+        }}, 60);
+      }});
+    </script>
+  </body>
+</html>
+"""
+    return components.html(html, height=height_px)
+
+
+def _parse_height_px(height: str | int | None) -> int | None:
+    if height is None:
+        return None
+    if isinstance(height, int):
+        return height
+    value = height.strip()
+    if value.endswith("px"):
+        value = value[:-2]
+    try:
+        return int(value)
+    except ValueError:
+        return None
 
 
 def _centroid(coordinates: list[tuple[float, float, float]]) -> tuple[float, float, float]:

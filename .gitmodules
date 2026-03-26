@@ -1,3 +1,0 @@
-[submodule "vendor/streamlit-molstar"]
-	path = vendor/streamlit-molstar
-	url = https://github.com/giorginolab/streamlit-molstar.git

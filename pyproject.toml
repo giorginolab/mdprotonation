@@ -7,17 +7,20 @@ requires-python = ">=3.13"
 dependencies = [
     "matplotlib>=3.10.8",
     "MDAnalysis>=2.10.0",
+    "molviewspec",
     "pdb2pqr>=3.7.1",
     "plotly>=6.6.0",
     "propka>=3.5.1",
     "streamlit>=1.55.0",
-    "streamlit-molstar",
 ]
 
 [tool.uv.sources]
-streamlit-molstar = { path = "vendor/streamlit-molstar" }
+molviewspec = { path = "vendor/mol-view-spec/molviewspec" }
 
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
