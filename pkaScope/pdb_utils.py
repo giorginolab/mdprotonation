@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from io import StringIO
+from math import isnan
 import tempfile
 import warnings
 
@@ -9,6 +10,7 @@ import MDAnalysis as mda
 
 ResidueKey = tuple[str, int, str]
 Coordinate3D = tuple[float, float, float]
+HISTIDINE_VARIANTS = frozenset({"HID", "HIE", "HIP", "HSD", "HSE", "HSP"})
 
 
 @dataclass(frozen=True)
@@ -59,6 +61,64 @@ def parse_pdb_atoms(
         )
         for atom in universe.atoms
     )
+
+
+def preprocess_pdb_text(pdb_text: str) -> str:
+    universe = load_pdb_universe(pdb_text)
+    for residue in universe.residues:
+        if str(residue.resname).strip().upper() in HISTIDINE_VARIANTS:
+            residue.resname = "HIS"
+
+    selected_atom_indices: dict[
+        tuple[str, int, str, str, str],
+        tuple[int, float, str],
+    ] = {}
+    for atom in universe.atoms:
+        atom_name = str(getattr(atom, "name", "")).strip().upper()
+        if atom_name.startswith("H"):
+            continue
+        element = str(getattr(atom, "element", "")).strip().upper()
+        if element == "H":
+            continue
+
+        altloc = str(getattr(atom, "altLoc", "")).strip().upper()
+        occupancy = float(getattr(atom, "occupancy", 0.0))
+        if isnan(occupancy):
+            occupancy = 0.0
+
+        chain_id = str(getattr(atom, "chainID", "")).strip()
+        if not chain_id:
+            chain_id = str(getattr(atom, "segid", "")).strip()
+        key = (
+            chain_id or "?",
+            int(getattr(atom, "resid")),
+            str(getattr(atom, "icode", "")).strip(),
+            str(getattr(atom, "resname", "")).strip().upper(),
+            atom_name,
+        )
+
+        current = selected_atom_indices.get(key)
+        if current is None:
+            selected_atom_indices[key] = (atom.index, occupancy, altloc)
+            continue
+
+        _, current_occupancy, current_altloc = current
+        if (
+            occupancy > current_occupancy
+            or (occupancy == current_occupancy and _altloc_rank(altloc) < _altloc_rank(current_altloc))
+        ):
+            selected_atom_indices[key] = (atom.index, occupancy, altloc)
+
+    kept_indices = sorted(index for index, _, _ in selected_atom_indices.values())
+    return write_pdb_atoms(universe.atoms[kept_indices])
+
+
+def _altloc_rank(altloc: str) -> tuple[int, str]:
+    if altloc == "A":
+        return (0, altloc)
+    if altloc == "":
+        return (1, altloc)
+    return (2, altloc)
 
 
 def atom_residue_key(atom: object) -> ResidueKey:

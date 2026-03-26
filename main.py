@@ -14,6 +14,7 @@ from pkaScope.panes import (
     render_propka_data_tab,
     render_sidebar_summary,
 )
+from pkaScope.pdb_utils import preprocess_pdb_text
 from pkaScope.propka_analysis import PropkaAnalysis, run_propka_analysis
 
 
@@ -77,6 +78,18 @@ def main() -> None:
             options=("Example PDB", "Upload PDB", "PDB Online"),
             index=0,
         )
+        preprocess_col, preprocess_help_col = st.columns((6, 1))
+        with preprocess_col:
+            preprocess_enabled = st.checkbox("Preprocess PDB", value=True)
+        with preprocess_help_col:
+            st.markdown(
+                (
+                    '<span title="Preprocessing currently renames HID/HIE/HIP/HSD/HSE/HSP '
+                    'to HIS, removes hydrogens, and resolves alternate locations by '
+                    'keeping one conformer per atom.">ⓘ</span>'
+                ),
+                unsafe_allow_html=True,
+            )
 
         if source_mode == "Example PDB":
             example_paths = sorted(Path("examples").glob("*.pdb"))
@@ -114,6 +127,9 @@ def main() -> None:
                 st.error(str(exc))
                 return
             source_name = f"{pdb_id}.pdb"
+
+        if preprocess_enabled:
+            pdb_text = preprocess_pdb_text(pdb_text)
 
         st.header("pH")
         ph = st.slider(
